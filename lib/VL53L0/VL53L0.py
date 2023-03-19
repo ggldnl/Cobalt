@@ -83,7 +83,7 @@ class VL53L0:
         GPIO.output(self.XSHUT, GPIO.LOW)
 
         # keep the pin low for 1000 ms or so to make sure it resets
-        time.sleep(1.0)
+        time.sleep(1.0) # TODO check if needed
 
         # create a VL53L0X object
 
@@ -207,15 +207,17 @@ class VL53L0:
         return distance
         
 
-if __name__ == '__main__':
+# ----------------------------------- main ----------------------------------- #
 
-    import time
+
+if __name__ == '__main__':
 
     xshut = [18, 26, 6]
     addr  = [0x2B, 0x2C, 0x2D]
 
     with VL53L0X(xshut[0], addr[0]) as tof:
 
+        import time
         interval = 30 # seconds
         t_end = time.time() + interval
 
@@ -223,4 +225,5 @@ if __name__ == '__main__':
 
             distance = tof.read()
             print('Sensor[{}] read distance {}'.format(tof.ADDR, distance))
+            time.sleep(1)
 
