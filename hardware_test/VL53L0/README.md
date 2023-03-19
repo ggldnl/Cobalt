@@ -1,0 +1,4 @@
+# VL53L0 ToF sensors
+
+Before using the sensors it is necessary to configure them. Being identical they will have the same address on the I2C bus. It is necessary to connect and disable (with the `xshut` pin to LOW) all of them, activate them one at a time using the standard address and change it before moving on to the next. Once you change the address, you can't turn the sensor off, otherwise it will reset and discard the changes.
+I used [these python API](https://github.com/pimoroni/VL53L0X-python/tree/master/) that are apparently a wrapper for an official c library provided by the manufacturer.
