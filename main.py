@@ -1,5 +1,7 @@
 import logging
 from lib.DRV8833.DRV8833 import DRV8833
+from lib.VL53L0.VL53L0 import VL53L0
+from lib.MPU6050.MPU6050 import MPU6050
 
 # ---------------------------------- logging --------------------------------- #
 
@@ -44,11 +46,46 @@ def main():
 
     logger.info('Starting Cobalt')
 
+    # ------------------------------- DRV8833 test ------------------------------- #
+
+    logger.info('DRV8833 test')
     with DRV8833() as motor_driver:
 
         channel = 'A'
         rate = 0.5
         motor_driver.write(channel, rate)
+
+    # -------------------------------- VL53L0 test ------------------------------- #
+
+    logger.info('VL53L0 test')
+    import time
+    with VL53L0() as distance_sensor:
+
+        interval = 30 # seconds
+        t_end = time.time() + interval
+
+        while time.time() < t_end:
+
+            distance = distance_sensor.read()
+            print('Sensor[{}] read distance {}'.format(distance_sensor.ADDR, distance))
+            time.sleep(0.1)
+
+    # ------------------------------- MPU6050 test ------------------------------- #
+
+    logger.info('MPU6050 test')
+    import time
+    with MPU6050() as mpu:
+
+        interval = 30 # seconds
+        t_end = time.time() + interval
+
+        while time.time() < t_end:
+
+            Ax, Ay, Az, Gx, Gy, Gz, T = mpu.read()
+            print('Ax[{}]\tAy[{}]\tAz[{}]\tGx[{}]\tGy[{}]\tGz[{}]\tT[{}]' \
+                .format(Ax, Ay, Az, Gx, Gy, Gz, T))
+            time.sleep(0.1)
+
 
     logger.info('Exiting Cobalt')
 
