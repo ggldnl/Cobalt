@@ -1,0 +1,17 @@
+# Ignore log files
+*.log
+
+# Ignore Python cache files
+__pycache__/
+
+# Ignore compiled Python files
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+*.pyzw
+
+# Ignore other cache files
+*.cache
+*.egg-info
