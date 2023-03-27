@@ -84,12 +84,16 @@ class DRV8833:
         frees the GPIO resources.
     """
 
+    # e.g.
+    # IN_1_A = 21, IN_2_A = 20
+    # IN_1_B = 16, IN_2_B = 12
+    # ENABLE = 7
     def __init__(self,
-                IN_1_A = 21, IN_2_A = 20,   # control pins for left motor
-                IN_1_B = 16, IN_2_B = 12,   # control pins for right motor
-                ENABLE = 7,                 # control pin to enable the board
-                decay = Decay.SLOW,         # decay mode
-                pwm_rate=1000):             # frequency
+                IN_1_A, IN_2_A,         # control pins for left motor
+                IN_1_B, IN_2_B,         # control pins for right motor
+                ENABLE,                 # control pin to enable the board
+                decay = Decay.SLOW,     # decay mode
+                pwm_rate=1000):         # frequency
 
         # pins
         self.IN_1_A = IN_1_A
@@ -519,7 +523,11 @@ if __name__ == '__main__':
 
     # -------------------------------- actual test ------------------------------- #
 
-    with DRV8833() as motor_driver:
+    with DRV8833(
+        IN_1_A = 21, IN_2_A = 20,
+        IN_1_B = 16, IN_2_B = 12,
+        ENABLE = 7
+    ) as motor_driver:
 
         # 65 is ascii uppercase a
         # 66 is ascii uppercase b
