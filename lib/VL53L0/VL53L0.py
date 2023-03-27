@@ -57,7 +57,7 @@ class VL53L0:
 
     def __init__(self, 
                 XSHUT,      # activation pin
-                ADDR        # address
+                ADDR = 0x29 # address
         ):
 
         self.XSHUT = XSHUT
@@ -87,7 +87,7 @@ class VL53L0:
 
         # create a VL53L0X object
 
-        self.tof = VL53L0X.VL53L0X(i2c_bus=1, i2c_address=0x29)
+        self.tof = VL53L0X.VL53L0X(i2c_bus=1, i2c_address=self.ADDR)
         self.tof.change_address(self.ADDR) # change address
         logger.debug('Address set to {}'.format(hex(self.ADDR).upper()))
 
