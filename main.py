@@ -59,7 +59,10 @@ def main():
 
     logger.info('VL53L0 test')
     import time
-    with VL53L0() as distance_sensor:
+
+    xshut = 18
+
+    with VL53L0(xshut) as distance_sensor:
 
         interval = 30 # seconds
         t_end = time.time() + interval
