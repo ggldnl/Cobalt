@@ -5,7 +5,7 @@ import logging
 
 # create a logger instance
 logger = logging.getLogger('DRV8833')
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 # done this way bot to omit the FileHandler specification and to avoid
 # the logger to write MAIN.DRV8833 on the file. For some reason this
@@ -87,7 +87,8 @@ class DRV8833:
     def __init__(self,
                 IN_1_A = 21, IN_2_A = 20,   # control pins for left motor
                 IN_1_B = 16, IN_2_B = 12,   # control pins for right motor
-                ENABLE = 7,
+                ENABLE = 7,                 # control pin to enable the board
+                decay = Decay.SLOW,         # decay mode
                 pwm_rate=1000):             # frequency
 
         # pins
@@ -96,12 +97,22 @@ class DRV8833:
         self.IN_1_B = IN_1_B
         self.IN_2_B = IN_2_B
         self.ENABLE = ENABLE
-        
+
+        logger.debug('IN_1_A set to {}'.format(IN_1_A))
+        logger.debug('IN_2_A set to {}'.format(IN_2_A))
+        logger.debug('IN_1_B set to {}'.format(IN_1_B))
+        logger.debug('IN_2_B set to {}'.format(IN_2_B))
+        logger.debug('ENABLE set to {}'.format(ENABLE))
+
         # frequency
         self.pwm_rate = pwm_rate
+        
+        logger.debug('PWM rate set to {}'.format(pwm_rate))
 
         # decay
-        self.decay = Decay.SLOW
+        self.decay = decay
+
+        logger.debug('Decay mode set to {}'.format(decay))
 
         self._setup()
 
@@ -125,7 +136,8 @@ class DRV8833:
         GPIO.setup(self.ENABLE, GPIO.OUT)
 
         # enable the board pulling self.ENABLE HIGH
-        GPIO.output(self.ENABLE, GPIO.HIGH)
+        # GPIO.output(self.ENABLE, GPIO.HIGH)
+        self.enable()
 
         # create a PWM instance:
         # p = GPIO.PWM(channel, frequency)
@@ -139,7 +151,7 @@ class DRV8833:
         self.pwm_1_B.start(0)
         self.pwm_2_B.start(0)
 
-        logger.info('Setup done')
+        logger.debug('Setup done')
 
     
     def enable (self):
@@ -176,22 +188,40 @@ class DRV8833:
         which the current in the motor windings is reduced when the motor 
         is turned off.
         
-        1. Fast decay mode: the current in the motor windings is rapidly 
+        1. Fast decay mode (1): the current in the motor windings is rapidly 
             reduced to zero when the power supply is turned off. This causes 
             the motor to quickly come to a stop.
 
-        2. Slow decay mode: the current in the motor windings is gradually 
+        2. Slow decay mode (0): the current in the motor windings is gradually 
             reduced to zero over a longer period of time. This can cause 
             the motor to continue rotating for a short period of time after 
             the power supply is turned off.
         
         Parameters
         ----------
-        decay : Decay
+        decay : Decay/str/int
             either LOW or FAST
         """
 
-        logger.info('Decay mode set to: {}'.format(decay))
+        if (
+            isinstance(decay, Decay) and
+            decay != Decay.SLOW and
+            decay != Decay.FAST
+        ) or (
+            isinstance(decay, str) and
+            decay.lower() != 'slow' and
+            decay.lower() != 'fast'
+        ) or (
+            isinstance(decay, int) and
+            decay != 0 and
+            decay != 1
+        ):
+            error_msg = 'Invalid decay mode: {}'.format(decay)
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        logger.info('Decay mode set to: {}'
+                    .format('SLOW' if decay == 1 else 'FAST'))
         self.decay = decay
 
 
@@ -253,10 +283,11 @@ class DRV8833:
 
         Parameters
         ----------
-        channel : int
-            0 for motor A, 1 for motor B
+        channel : int/str
+            0/'a'/'A' for motor A, 1/'b'/'B' for motor B
         reate : float
             modulation value between -1.0 and 1.0, full reverse to full forward.
+            0 stops the motor.
             
         Raises
         ------
@@ -268,10 +299,13 @@ class DRV8833:
         rate = round(rate, 2)
 
         if (
-            channel != 0 and 
-            channel != 'A' and
-            channel != 1 and
-            channel != 'B'
+            isinstance(channel, str) and
+            channel.lower() != 'a' and
+            channel.lower() != 'b'
+        ) or (
+            isinstance(channel, int) and
+            channel != 0 and
+            channel != 1
         ):
             error_msg = 'Invalid channel identifier: {}'.format(channel)
             logger.error(error_msg)
@@ -298,36 +332,48 @@ class DRV8833:
                 elif rate < 0: # backward
                     self.pwm_1_A.ChangeDutyCycle(pwm)
                     self.pwm_2_A.ChangeDutyCycle(0)
+                else: # stop
+                    self.pwm_1_A.ChangeDutyCycle(0)
+                    self.pwm_2_A.ChangeDutyCycle(0)
 
-            elif channel == 1 or channel == 'B' or channel == 'b':
+            else:
                 if rate > 0: # forward
                     self.pwm_1_B.ChangeDutyCycle(pwm)
                     self.pwm_2_B.ChangeDutyCycle(0)
                 elif rate < 0: # backward
                     self.pwm_1_B.ChangeDutyCycle(0)
                     self.pwm_2_B.ChangeDutyCycle(pwm)
+                else:
+                    self.pwm_1_B.ChangeDutyCycle(0)
+                    self.pwm_2_B.ChangeDutyCycle(0)
 
-        elif self.decay == Decay.SLOW:
+        else:
 
             if channel == 0 or channel == 'A' or channel == 'a':
                 if rate > 0: # forward
                     self.pwm_1_A.ChangeDutyCycle(pwm)
-                    self.pwm_2_A.ChangeDutyCycle(100)                
+                    self.pwm_2_A.ChangeDutyCycle(100)
                 elif rate < 0: # backward
                     self.pwm_1_A.ChangeDutyCycle(100)
                     self.pwm_2_A.ChangeDutyCycle(pwm)
+                else: # stop
+                    self.pwm_1_A.ChangeDutyCycle(0)
+                    self.pwm_2_A.ChangeDutyCycle(0)
 
-            elif channel == 1 or channel == 'B' or channel == 'b':
+            else:
                 if rate > 0: # forward
                     self.pwm_1_B.ChangeDutyCycle(100)
                     self.pwm_2_B.ChangeDutyCycle(pwm)
                 elif rate < 0: # backward
                     self.pwm_1_B.ChangeDutyCycle(pwm)
                     self.pwm_2_B.ChangeDutyCycle(100)
+                else:
+                    self.pwm_1_B.ChangeDutyCycle(0)
+                    self.pwm_2_B.ChangeDutyCycle(0)
 
         logger.info('Channel {} {} at {}%'.format(
             channel, 'forward' if rate > 0 else 'backward', pwm))
-                
+
 
     def read(self, channel):
         """
@@ -354,6 +400,7 @@ class DRV8833:
             return self.channel_A_rate
         elif channel == 1 or channel == 'B' or channel == 'b':
             return self.channel_B_rate
+        
         error_msg = 'Invalid channel identifier: {}'.format(channel)
         logger.error(error_msg)
         raise ValueError(error_msg)
@@ -421,6 +468,26 @@ if __name__ == '__main__':
 
     from time import sleep
 
+    # ------------------------------- logger setup ------------------------------- #
+
+    # create a logger instance
+    logger = logging.getLogger('MAIN')
+    logger.setLevel(logging.INFO)
+
+    # create a formatter instance
+    formatter = logging.Formatter(
+        '%(asctime)s\t%(name)s\t%(levelname)s\t%(message)s'
+        )
+
+    # create a handler instance
+    handler = logging.FileHandler('../../log/cobalt.log', 'w')
+    # handler.setLevel(logging.DEBUG)
+    handler.setFormatter(formatter)
+
+    logger.addHandler(handler)
+
+    # --------------------------- float range generator -------------------------- #
+
     # The Python range() works only with integers. It doesn’t support the 
     # float type:
     # Output TypeError: 'float' object cannot be interpreted as an integer
@@ -448,20 +515,36 @@ if __name__ == '__main__':
             yield temp
             count += 1
 
+    # -------------------------------- actual test ------------------------------- #
 
     with DRV8833() as motor_driver:
 
-        # channel = 'A'
-        # motor_driver.write(channel, 1.0)
-        # motor_driver.write(channel, -1.0)
-        # sleep(5)
+        # 65 is ascii uppercase a
+        # 66 is ascii uppercase b
+        for i in range(65, 67):
+            channel = chr(i)
+            for rate in frange(-1.0, 1.0, 0.1):
+                print('Channel {}\tDirection {}\t Duty cycle {}'.format(
+                    channel, 'forward' if rate > 0 else 'backward' , round(rate, 2)))
+                motor_driver.write(channel, rate)
+                sleep(1)
 
-        channel = 'A'
+            # stop the motor, otherwise the last suitable rate is kept
+            print('Stopping channel {}'.format(channel))
+            motor_driver.write(channel, 0)
+
+        # test both motors at the same time
         for rate in frange(-1.0, 1.0, 0.1):
-            print('Channel {}\tDirection {}\t Duty cycle {}'.format(
-                channel, 'forward' if rate > 0 else 'backward' ,rate))
-            motor_driver.write(channel, rate)
+            print('Both channels \tDirection {}\t Duty cycle {}'.format(
+                'forward' if rate > 0 else 'backward' , round(rate, 2)))
+            motor_driver.write('a', rate)
+            motor_driver.write('b', rate)
             sleep(1)
 
-        # the close() function is automatically called by __exit__()
-        # once the with block ends
+
+    # the close() function is automatically called by __exit__()
+    # once the with block ends
+
+    # stop the motor, otherwise the last suitable rate is kept
+    print('Stopping channel {}'.format(channel))
+    motor_driver.write(channel, 0)
