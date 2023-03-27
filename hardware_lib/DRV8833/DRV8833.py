@@ -203,18 +203,19 @@ class DRV8833:
             either LOW or FAST
         """
 
-        if (
-            isinstance(decay, Decay) and
+        if isinstance(decay, Decay) and (
             decay != Decay.SLOW and
             decay != Decay.FAST
-        ) or (
-            isinstance(decay, str) and
+        ) or isinstance(decay, str) and (
             decay.lower() != 'slow' and
             decay.lower() != 'fast'
-        ) or (
-            isinstance(decay, int) and
+        ) or isinstance(decay, int) and(
             decay != 0 and
             decay != 1
+        ) or (
+            not isinstance(decay, Decay) and
+            not isinstance(decay, str) and
+            not isinstance(decay, int)
         ):
             error_msg = 'Invalid decay mode: {}'.format(decay)
             logger.error(error_msg)
@@ -298,14 +299,15 @@ class DRV8833:
 
         rate = round(rate, 2)
 
-        if (
-            isinstance(channel, str) and
+        if isinstance(channel, str) and (
             channel.lower() != 'a' and
             channel.lower() != 'b'
-        ) or (
-            isinstance(channel, int) and
+        ) or isinstance(channel, int) and(
             channel != 0 and
             channel != 1
+        ) or (
+            not isinstance(channel, str) and
+            not isinstance(channel, int)
         ):
             error_msg = 'Invalid channel identifier: {}'.format(channel)
             logger.error(error_msg)
@@ -540,7 +542,6 @@ if __name__ == '__main__':
             motor_driver.write('a', rate)
             motor_driver.write('b', rate)
             sleep(1)
-
 
     # the close() function is automatically called by __exit__()
     # once the with block ends
