@@ -17,17 +17,29 @@ logger.parent = parent_logger
 # --------------------------- encoder core library --------------------------- #
 
 
+import enum
+
+class Direction(enum.Enum):
+    CLOCKWISE = 0
+    COUNTERCLOCKWISE = 1
+
+
 class Encoder:
 
-    def __init__(self, PIN_A, PIN_B):
+    def __init__(self, PIN_CLK, PIN_DT, direction = Direction.CLOCKWISE):
 
-        self.PIN_A = PIN_A
-        self.PIN_B = PIN_B
+        self.PIN_CLK = PIN_CLK # clock
+        self.PIN_DT = PIN_DT # data
 
-        logger.debug('PIN_A set to {}'.format(PIN_A))
-        logger.debug('PIN_B set to {}'.format(PIN_B))
+        logger.debug('PIN_CLK set to {}'.format(PIN_CLK))
+        logger.debug('PIN_DT set to {}'.format(PIN_DT))
 
-        self._value = 0
+        self._count = 0
+        self._direction = direction
+        self._current_clk = 0 # current clock value (A)
+        self._last_clk = 0 # last clock value
+
+        self._setup()
 
     
     def _setup(self):
@@ -40,31 +52,47 @@ class Encoder:
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM) # init the library
 
-        GPIO.setup(self.PIN_A, GPIO.IN)
-        GPIO.setup(self.PIN_B, GPIO.IN)
+        GPIO.setup(self.PIN_CLK, GPIO.IN)
+        GPIO.setup(self.PIN_DT, GPIO.IN)
 
-        # for now, only one pin is used and the direction in which the 
-        # motor is spinning can not be inferred.
-        # TODO -> use both pins
-        GPIO.add_event_detect(self.PIN_A, GPIO.RISING, callback=self._increment)
+        GPIO.add_event_detect(self.PIN_CLK, GPIO.FALLING, callback=self._update)
+        GPIO.add_event_detect(self.PIN_DT, GPIO.FALLING, callback=self._update)
 
         logger.debug('Setup done')
 
 
-    def reset(self):
+    def _update(self, channel):
         
-        logger.debug('Reset ticks')
+        logger.debug('Updating encoder')
 
-        self._value = 0
+        self._current_clk = GPIO.input(self.PIN_CLK)
+
+        if (self._current_clk != self._last_clk and 
+            self._current_clk == GPIO.HIGH):
+
+            self._count -= 1
+            self._direction = Direction.COUNTERCLOCKWISE
+
+        else:
+
+            self._count += 1
+            self._direction = Direction.CLOCKWISE
+        
+        self._last_clk = self._current_clk
 
 
-    def _increment(self):
-        self._value += 1
+    def reset(self):
+        logger.debug('Reset encoder ticks')
+        self._count = 0
 
 
-    def read(self):
-        return self._value
-    
+    def read_count(self):
+        return self._count
+
+
+    def read_direction(self):
+        return self._direction
+
 
     def close (self):
         """
@@ -75,8 +103,8 @@ class Encoder:
         # calling GPIO.cleanup() will affect all the pins,
         # even the ones used in other modules
         # GPIO.cleanup()
-        GPIO.setup(self.PIN_A, GPIO.IN)
-        GPIO.setup(self.PIN_B, GPIO.IN)
+        GPIO.setup(self.PIN_CLK, GPIO.IN)
+        GPIO.setup(self.PIN_DT, GPIO.IN)
 
 
     def __enter__(self):
@@ -84,9 +112,8 @@ class Encoder:
 
 
     def __del__ (self):
-        # self.close()
-        pass
-
+        self.close()
+        
 
     def __exit__(self, exc_type, exc_value, tb):
 
@@ -108,7 +135,7 @@ if __name__ == '__main__':
 
     # create a logger instance
     logger = logging.getLogger('MAIN')
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
 
     # create a formatter instance
     formatter = logging.Formatter(
@@ -116,7 +143,7 @@ if __name__ == '__main__':
         )
 
     # create a handler instance
-    handler = logging.FileHandler('../../log/cobalt.log', 'w')
+    handler = logging.FileHandler('log/encoder.log', 'w')
     # handler.setLevel(logging.DEBUG)
     handler.setFormatter(formatter)
 
@@ -124,16 +151,21 @@ if __name__ == '__main__':
 
     # -------------------------------- actual test ------------------------------- #
 
-    from time import sleep
+    import time
 
     sampling_rate = 0.1 # read the encoder value once every 0.1 seconds
+    sampling_time = 20 # read the encoder value for 10 seconds
 
     with Encoder(
-        PIN_A = 7,  # TODO fix
-        PIN_B = 8
+        PIN_CLK = 25,  # TODO fix
+        PIN_DT = 8
     ) as encoder:
 
-        val = encoder.read()
-        print('Encoder ticks: {}'.format(val))
+        t_end = time.time() + sampling_time
+        while time.time() < t_end:
 
-        sleep(sampling_rate)
+            val = encoder.read_count()
+            dir = encoder.read_direction()
+            print('Encoder [{}] [{}]'.format(val, 'CCW' if dir == Direction.COUNTERCLOCKWISE else 'CW '))
+
+            time.sleep(sampling_rate)

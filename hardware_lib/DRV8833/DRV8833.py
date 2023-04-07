@@ -486,7 +486,7 @@ if __name__ == '__main__':
         )
 
     # create a handler instance
-    handler = logging.FileHandler('../../log/cobalt.log', 'w')
+    handler = logging.FileHandler('../../log/DRV8833.log', 'w')
     # handler.setLevel(logging.DEBUG)
     handler.setFormatter(formatter)
 

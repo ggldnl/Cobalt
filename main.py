@@ -1,7 +1,12 @@
 import logging
-from lib.DRV8833.DRV8833 import DRV8833
-from lib.VL53L0.VL53L0 import VL53L0
-from lib.MPU6050.MPU6050 import MPU6050
+
+from hardware_lib.DRV8833.DRV8833 import DRV8833
+from hardware_lib.VL53L0.VL53L0 import VL53L0
+from hardware_lib.MPU6050.MPU6050 import MPU6050
+
+from lib.encoder import Encoder
+#from test.counter import Counter
+
 
 # ---------------------------------- logging --------------------------------- #
 
@@ -42,12 +47,69 @@ logger.addHandler(handler)
 # ----------------------------------- main ----------------------------------- #
 
 
+def frange(start, stop=None, step=None):
+
+    start = float(start)
+    if stop == None:        # if stop is not specified
+        stop = start + 0.0
+        start = 0.0
+    if step == None:        # if step is not specified
+        step = 1.0
+
+    # print("start = ", start, "stop = ", stop, "step = ", step)
+
+    count = 0
+    while True:
+        temp = float(start + count * step)
+        if step > 0 and temp >= stop:
+            break
+        elif step < 0 and temp <= stop:
+            break
+        yield temp
+        count += 1
+
 def main():
 
     logger.info('Starting Cobalt')
 
+    import time
 
-    # TODO do something
+    #with Encoder(
+    #    PIN_A = 25,
+    #    PIN_B = 8
+    #) as encoder, Counter(
+    #    25
+    #) as counter, DRV8833(
+    #    IN_1_A = 21, IN_2_A = 20,
+    #    IN_1_B = 16, IN_2_B = 12,
+    #    ENABLE = 7
+    #) as motor_driver:
+
+    with Encoder(
+        PIN_CLK = 25,
+        PIN_DT = 8
+    ) as encoder, DRV8833(
+        IN_1_A = 21, IN_2_A = 20,
+        IN_1_B = 16, IN_2_B = 12,
+        ENABLE = 7
+    ) as motor_driver:
+
+        channel = 'A'
+        for rate in frange(-1.0, 1.0, 0.1):
+            print('Channel {}\tDirection {}\t Duty cycle {}'.format(
+                channel, 'forward' if rate > 0 else 'backward' , round(rate, 2)))
+            motor_driver.write(channel, rate)
+
+            val = encoder.read_count()
+            #val = counter.get_value()
+            print('Encoder ticks: {}'.format(val))
+
+            time.sleep(1)
+
+        # stop the motor, otherwise the last suitable rate is kept
+        print('Stopping channel {}'.format(channel))
+        motor_driver.write(channel, 0)
+
 
 
     logger.info('Exiting Cobalt')

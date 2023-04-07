@@ -209,8 +209,27 @@ class VL53L0:
 
 # ----------------------------------- main ----------------------------------- #
 
-
 if __name__ == '__main__':
+
+    # ------------------------------- logger setup ------------------------------- #
+
+    # create a logger instance
+    logger = logging.getLogger('MAIN')
+    logger.setLevel(logging.INFO)
+
+    # create a formatter instance
+    formatter = logging.Formatter(
+        '%(asctime)s\t%(name)s\t%(levelname)s\t%(message)s'
+        )
+
+    # create a handler instance
+    handler = logging.FileHandler('../../log/VL53L0X.log', 'w')
+    # handler.setLevel(logging.DEBUG)
+    handler.setFormatter(formatter)
+
+    logger.addHandler(handler)
+
+    # -------------------------------- actual test ------------------------------- #
 
     xshut = [18, 26, 6]
     addr  = [0x2B, 0x2C, 0x2D]
