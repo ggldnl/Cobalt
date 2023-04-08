@@ -141,7 +141,13 @@ class DRV8833:
 
         # enable the board pulling self.ENABLE HIGH
         # GPIO.output(self.ENABLE, GPIO.HIGH)
-        self.enable()
+        # self.enable()
+
+        # we could have multiple instasnces of the DRV8833
+        # so we should first check if the enable pin is 
+        # already in use
+        if GPIO.gpio_function(18) != GPIO.OUT:        
+            self.enable()
 
         # create a PWM instance:
         # p = GPIO.PWM(channel, frequency)
