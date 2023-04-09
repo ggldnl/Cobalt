@@ -1,6 +1,22 @@
 from pid import PID
 from encoder import Encoder
-from hardware_lib.DRV8833.DRV8833 import DRV8833
+from hardlib.DRV8833.DRV8833 import DRV8833
+import logging
+
+# ---------------------------------- logging --------------------------------- #
+
+# create a logger instance
+logger = logging.getLogger('MOTOR')
+logger.setLevel(logging.DEBUG)
+
+# done this way bot to omit the FileHandler specification and to avoid
+# the logger to write MAIN.DRV8833 on the file. For some reason this
+# works
+parent_logger = logging.getLogger('MAIN')
+logger.parent = parent_logger
+
+
+# --------------------------- encoder core library --------------------------- #
 
 class Motor:
     """
@@ -15,6 +31,7 @@ class Motor:
                   IN_1_A, IN_2_A,
                   IN_1_B, IN_2_B,
                   ENABLE,
+                  channel,
                   # PID
                   KP, KI, KD
                 ):
@@ -32,6 +49,8 @@ class Motor:
             IN_1_B = IN_1_B, IN_2_B = IN_2_B,
             ENABLE = ENABLE
         )
+        self.channel = channel
+
         self.encoder = Encoder (
             PIN_CLK = PIN_CLK,
             PIN_DT = PIN_DT
@@ -43,11 +62,9 @@ class Motor:
             KD = KD
         )
 
-        # assign a channel
 
-
-    def forward (self):
-        pass
+    def forward (self, rate):
+        self.DRV8833.write(self.channel, rate)
 
 
     def backward (self):

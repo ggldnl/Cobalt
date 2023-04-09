@@ -1,12 +1,10 @@
 import logging
 
-from hardware_lib.DRV8833.DRV8833 import DRV8833
-from hardware_lib.VL53L0.VL53L0 import VL53L0
-from hardware_lib.MPU6050.MPU6050 import MPU6050
+from hardlib.DRV8833.DRV8833 import DRV8833
+from hardlib.VL53L0.VL53L0 import VL53L0
+from hardlib.MPU6050.MPU6050 import MPU6050
 
 from lib.encoder import Encoder
-#from test.counter import Counter
-
 
 # ---------------------------------- logging --------------------------------- #
 
@@ -74,17 +72,6 @@ def main():
 
     import time
 
-    #with Encoder(
-    #    PIN_A = 25,
-    #    PIN_B = 8
-    #) as encoder, Counter(
-    #    25
-    #) as counter, DRV8833(
-    #    IN_1_A = 21, IN_2_A = 20,
-    #    IN_1_B = 16, IN_2_B = 12,
-    #    ENABLE = 7
-    #) as motor_driver:
-
     with Encoder(
         PIN_CLK = 25,
         PIN_DT = 8
@@ -95,21 +82,43 @@ def main():
     ) as motor_driver:
 
         channel = 'A'
-        for rate in frange(-1.0, 1.0, 0.1):
-            print('Channel {}\tDirection {}\t Duty cycle {}'.format(
-                channel, 'forward' if rate > 0 else 'backward' , round(rate, 2)))
-            motor_driver.write(channel, rate)
 
-            val = encoder.read_count()
-            #val = counter.get_value()
-            print('Encoder ticks: {}'.format(val))
+        num_exec = 10
+        pwm_to_log = 70.0
+        log_pwm = []
 
-            time.sleep(1)
+        for i in range(num_exec):
 
-        # stop the motor, otherwise the last suitable rate is kept
-        print('Stopping channel {}'.format(channel))
-        motor_driver.write(channel, 0)
+            print('Run [{}]'.format(i))
 
+            """
+            for rate in frange(0.0, 1.0, 0.05):
+                #print('Channel {}\tDirection {}\t Duty cycle {}'.format(
+                #    channel, 'forward' if rate > 0 else 'backward' , round(rate, 2)))
+                motor_driver.write(channel, rate)
+
+                val = encoder.read_count()
+                #val = counter.get_value()
+                #print('Encoder ticks: {}'.format(val))
+
+                _rate = round(rate, 2)
+                pwm = (abs(_rate) * 100)
+                print('PWM [{:5.2f}] -> RPM [{}]'.format(pwm, val))
+
+                time.sleep(1)
+
+            # stop the motor, otherwise the last suitable rate is kept
+            print('Stopping channel {}'.format(channel))
+            motor_driver.write(channel, 0)
+            """
+            
+            motor_driver.write(channel, pwm_to_log / 100.0)
+
+            time.sleep(0.5)
+            encoder.reset()
+
+        avg = sum(log_pwm) / num_exec
+        print('Average for pwm {}: {}'.format(pwm_to_log, avg))
 
 
     logger.info('Exiting Cobalt')

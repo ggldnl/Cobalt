@@ -1,5 +1,3 @@
-
-
 class PID:
 
     def __init__ (self, KP, KI, KD):
