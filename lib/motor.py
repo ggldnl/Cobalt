@@ -63,16 +63,10 @@ class Motor:
         )
 
 
-    def forward (self, rate):
-        self.DRV8833.write(self.channel, rate)
+    def move (self, speed):
 
-
-    def backward (self):
-        pass
-
-
-    def stop (self):
-        pass
+        speed = max(-1.0, min(1.0, speed)) # gives a number in range [-1.0, 1.0]
+        self.DRV8833.write(self.channel, speed)
 
     
     def close (self):
