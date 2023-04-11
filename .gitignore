@@ -15,3 +15,5 @@ __pycache__/
 # Ignore other cache files
 *.cache
 *.egg-info
+*.idea
+*.vscode
