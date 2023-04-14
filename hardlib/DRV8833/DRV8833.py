@@ -110,13 +110,17 @@ class DRV8833:
 
         # frequency
         self.pwm_rate = pwm_rate
-        
+
         logger.debug('PWM rate set to {}'.format(pwm_rate))
 
         # decay
         self.decay = decay
 
         logger.debug('Decay mode set to {}'.format(decay))
+
+        # channel A and B rate
+        self.channel_A_rate = 0
+        self.channel_B_rate = 0
 
         self._setup()
 
@@ -146,7 +150,7 @@ class DRV8833:
         # we could have multiple instasnces of the DRV8833
         # so we should first check if the enable pin is 
         # already in use
-        if GPIO.gpio_function(18) != GPIO.OUT:        
+        if GPIO.gpio_function(18) != GPIO.OUT:
             self.enable()
 
         # create a PWM instance:
@@ -163,7 +167,38 @@ class DRV8833:
 
         logger.debug('Setup done')
 
-    
+
+    def _check_channel (self, channel):
+
+        # 65 is ascii uppercase a
+        # 66 is ascii uppercase b
+        # 97 is ascii lowercase a
+        # 98 is ascii lowercase b
+
+        if isinstance(channel, str):
+            if channel.lower() == 'a' or channel.lower() == 'b':
+                return abs(chr(channel.lower()) - 97)
+
+        if isinstance(channel, int):
+            if channel.lower() == 0 or channel.lower() == 1:
+                return channel
+
+        # channel is not instance of int or string and is not 'a'/'b'/0/1
+
+        error_msg = 'Invalid channel identifier: {}'.format(channel)
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+
+
+    def _check_rate (self, rate):
+
+        if not isinstance(rate, int):
+            if abs(rate) > 1.0:
+                error_msg = 'Invalid modulation rate: {}'.format(rate)
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+
+
     def enable (self):
         """
         Enables the board.
@@ -171,7 +206,7 @@ class DRV8833:
         logger.info('Board enabled')
         GPIO.output(self.ENABLE, GPIO.HIGH)
 
-    
+
     def disable (self):
         """
         Disables the board.
@@ -179,7 +214,7 @@ class DRV8833:
         logger.info('Board disabled')
         GPIO.output(self.ENABLE, GPIO.LOW)
 
-    
+
     def getStatus (self):
         """
         Tells if the board is enabled or disabled.
@@ -243,7 +278,7 @@ class DRV8833:
         logger.info('Decay mode set to: SLOW')
         self.decay = Decay.SLOW
 
-    
+
     def setFastDecay (self):
         """
         Set the decay mode to FAST
@@ -251,7 +286,7 @@ class DRV8833:
         logger.info('Decay mode set to: FAST')
         self.decay = Decay.FAST
 
-    
+
     def getDecayMode (self):
         """
         Get the current decay mode.
@@ -307,26 +342,16 @@ class DRV8833:
             is out of bounds.
         """
 
-        rate = round(rate, 2)
+        # check the channel
+        int_channel = self._check_channel(channel)
 
-        if isinstance(channel, str) and (
-            channel.lower() != 'a' and
-            channel.lower() != 'b'
-        ) or isinstance(channel, int) and(
-            channel != 0 and
-            channel != 1
-        ) or (
-            not isinstance(channel, str) and
-            not isinstance(channel, int)
-        ):
-            error_msg = 'Invalid channel identifier: {}'.format(channel)
-            logger.error(error_msg)
-            raise ValueError(error_msg)
-        
-        if rate < -1.0 or rate > 1.0:
-            error_msg = 'Invalid modulation rate: {}'.format(rate)
-            logger.error(error_msg)
-            raise ValueError(error_msg)
+        # check the modulation rate
+        self._check_rate(rate)
+
+        # clip the rate value between -1.0 and 1.0
+        # rate = round(rate, 2)
+        # rate = max(-1.0, min(1.0, rate))
+        # if the value is outside [-1.0, 1.0], _check_rate raises an exception
 
         # convert the rate (range [-1.0, 0.0]) into percentage and direction 
         # (rate >/< 0)
@@ -336,17 +361,18 @@ class DRV8833:
 
         if self.decay == Decay.FAST:
 
-            if channel == 0 or channel == 'A' or channel == 'a':
+            if int_channel == 0:
                 if rate > 0: # forward
                     # dc is the duty cycle (0.0 <= dc <= 100.0)
                     self.pwm_1_A.ChangeDutyCycle(0)
-                    self.pwm_2_A.ChangeDutyCycle(pwm)    
+                    self.pwm_2_A.ChangeDutyCycle(pwm)
                 elif rate < 0: # backward
                     self.pwm_1_A.ChangeDutyCycle(pwm)
                     self.pwm_2_A.ChangeDutyCycle(0)
                 else: # stop
                     self.pwm_1_A.ChangeDutyCycle(0)
                     self.pwm_2_A.ChangeDutyCycle(0)
+                self.channel_A_rate = rate
 
             else:
                 if rate > 0: # forward
@@ -358,10 +384,11 @@ class DRV8833:
                 else:
                     self.pwm_1_B.ChangeDutyCycle(0)
                     self.pwm_2_B.ChangeDutyCycle(0)
+                self.channel_B_rate = rate
 
         else:
 
-            if channel == 0 or channel == 'A' or channel == 'a':
+            if int_channel == 0:
                 if rate > 0: # forward
                     self.pwm_1_A.ChangeDutyCycle(pwm)
                     self.pwm_2_A.ChangeDutyCycle(100)
@@ -371,6 +398,7 @@ class DRV8833:
                 else: # stop
                     self.pwm_1_A.ChangeDutyCycle(0)
                     self.pwm_2_A.ChangeDutyCycle(0)
+                self.channel_A_rate = rate
 
             else:
                 if rate > 0: # forward
@@ -382,9 +410,10 @@ class DRV8833:
                 else:
                     self.pwm_1_B.ChangeDutyCycle(0)
                     self.pwm_2_B.ChangeDutyCycle(0)
+                self.channel_B_rate = rate
 
         logger.info('Channel {} {} at {}%'.format(
-            channel, 'forward' if rate > 0 else 'backward', pwm))
+            chr(int_channel + 65), 'forward' if rate > 0 else 'backward', pwm))
 
 
     def read(self, channel):
@@ -408,21 +437,20 @@ class DRV8833:
 
         """
 
-        if channel == 0 or channel == 'A' or channel == 'a':
+        # check if the channel is correctly formatted and return the channel as int
+        int_channel = self._check_channel(channel)
+
+        if int_channel == 0:
             return self.channel_A_rate
-        elif channel == 1 or channel == 'B' or channel == 'b':
-            return self.channel_B_rate
-        
-        error_msg = 'Invalid channel identifier: {}'.format(channel)
-        logger.error(error_msg)
-        raise ValueError(error_msg)
+
+        return self.channel_B_rate
 
 
     # The __enter__ method is called when a block of code is entered, 
     # such as a with statement.
     def __enter__(self):
         return self
-    
+
 
     def close (self):
         """
@@ -449,7 +477,7 @@ class DRV8833:
         GPIO.setup(self.IN_2_A, GPIO.IN)
         GPIO.setup(self.IN_2_B, GPIO.IN)
         GPIO.setup(self.ENABLE, GPIO.IN)
-   
+
 
     # When an object is no longer being used by a program, Python's garbage 
     # collector automatically deletes the object and frees up the memory it 
@@ -467,7 +495,7 @@ class DRV8833:
         if exc_type is not None:
             logger.error('Exception during call to __exit__: {}'.format(exc_type))
             return False
-        
+
         self.close()
 
         return True
