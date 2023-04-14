@@ -128,7 +128,7 @@ class DRV8833:
     def _setup(self):
         """
         Sets up the hardware by setting the pins as OUTPUT
-        and creating the pwm objects, one for each channel, whith
+        and creating the pwm objects, one for each channel, with
         which the direction and speed of each channel is controlled.
         """
 
