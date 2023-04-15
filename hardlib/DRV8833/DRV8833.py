@@ -162,11 +162,12 @@ class DRV8833:
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)  # init the library
 
-        # TODO check if a None raises an exception
-        GPIO.setup(self.IN_1_A, GPIO.OUT)
-        GPIO.setup(self.IN_2_A, GPIO.OUT)
-        GPIO.setup(self.IN_1_B, GPIO.OUT)
-        GPIO.setup(self.IN_2_B, GPIO.OUT)
+        if self.channel_A_enabled:
+            GPIO.setup(self.IN_1_A, GPIO.OUT)
+            GPIO.setup(self.IN_2_A, GPIO.OUT)
+        if self.channel_B_enabled:
+            GPIO.setup(self.IN_1_B, GPIO.OUT)
+            GPIO.setup(self.IN_2_B, GPIO.OUT)
         GPIO.setup(self.ENABLE, GPIO.OUT)
 
         # enable the board pulling self.ENABLE HIGH
@@ -181,16 +182,17 @@ class DRV8833:
 
         # create a PWM instance:
         # p = GPIO.PWM(channel, frequency)
-        # TODO check if a None raises an exception
-        self.pwm_1_A = GPIO.PWM(self.IN_1_A, self.pwm_rate)
-        self.pwm_2_A = GPIO.PWM(self.IN_2_A, self.pwm_rate)
-        self.pwm_1_B = GPIO.PWM(self.IN_1_B, self.pwm_rate)
-        self.pwm_2_B = GPIO.PWM(self.IN_2_B, self.pwm_rate)
+        if self.channel_A_enabled:
+            self.pwm_1_A = GPIO.PWM(self.IN_1_A, self.pwm_rate)
+            self.pwm_2_A = GPIO.PWM(self.IN_2_A, self.pwm_rate)
+            self.pwm_1_A.start(0)
+            self.pwm_2_A.start(0)
 
-        self.pwm_1_A.start(0)
-        self.pwm_2_A.start(0)
-        self.pwm_1_B.start(0)
-        self.pwm_2_B.start(0)
+        if self.channel_B_enabled:
+            self.pwm_1_B = GPIO.PWM(self.IN_1_B, self.pwm_rate)
+            self.pwm_2_B = GPIO.PWM(self.IN_2_B, self.pwm_rate)
+            self.pwm_1_B.start(0)
+            self.pwm_2_B.start(0)
 
         logger.debug('Setup done')
 
@@ -406,6 +408,15 @@ class DRV8833:
         # check the channel
         parsed_channel = self._parse_channel(channel)
 
+        # check if the channel is enabled
+        if (
+                channel == 0 and not self.channel_A_enabled or
+                channel == 1 and not self.channel_B_enabled
+            ):
+            error_msg = 'Channel {0:s} is not enabled'.format(chr(parsed_channel + 65))
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
         # check the modulation rate
         parsed_rate = self._parse_rate(rate)
 
@@ -488,6 +499,15 @@ class DRV8833:
         # check if the channel is correctly formatted and return the channel as int
         parsed_channel = self._parse_channel(channel)
 
+        # check if the channel is enabled
+        if (
+                channel == 0 and not self.channel_A_enabled or
+                channel == 1 and not self.channel_B_enabled
+            ):
+            error_msg = 'Channel {0:s} is not enabled'.format(chr(parsed_channel + 65))
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
         if parsed_channel == 0:
             return self.channel_A_rate
 
@@ -518,10 +538,14 @@ class DRV8833:
         # calling GPIO.cleanup() will affect all the pins,
         # even the ones used in other modules
         # GPIO.cleanup()
-        GPIO.setup(self.IN_1_A, GPIO.IN)
-        GPIO.setup(self.IN_1_B, GPIO.IN)
-        GPIO.setup(self.IN_2_A, GPIO.IN)
-        GPIO.setup(self.IN_2_B, GPIO.IN)
+        if self.channel_A_enabled:
+            GPIO.setup(self.IN_1_A, GPIO.IN)
+            GPIO.setup(self.IN_2_A, GPIO.IN)
+
+        if self.channel_B_enabled:
+            GPIO.setup(self.IN_1_B, GPIO.IN)
+            GPIO.setup(self.IN_2_B, GPIO.IN)
+
         GPIO.setup(self.ENABLE, GPIO.IN)
 
     # When an object is no longer being used by a program, Python's garbage
@@ -625,6 +649,8 @@ if __name__ == '__main__':
             'SLOW' if motor_driver.getDecayMode() == Decay.SLOW else 'FAST'
         ))
 
+        # --------------------- test both channels independently --------------------- #
+
         for channel in range(2):
 
             for rate in frange(-1.0, 1.1, 0.1):
@@ -636,6 +662,8 @@ if __name__ == '__main__':
             # stop the motor, otherwise the last suitable rate is kept
             print('Stopping channel {}'.format(chr(channel + 65)))
             motor_driver.write(channel, 0)
+
+        # -------------------- test both channels at the same time ------------------- #
 
         # test both motors at the same time
         for rate in frange(-1.0, 1.0, 0.1):
@@ -652,3 +680,26 @@ if __name__ == '__main__':
 
     # the close() function is automatically called by __exit__()
     # once the with block ends
+
+    # ------------------------ test two DRV8833 instances ------------------------ #
+
+    with DRV8833(
+            IN_1_A=IN_1_LEFT, IN_2_A=IN_2_LEFT,
+            IN_1_B=None, IN_2_B=None,
+            ENABLE=7
+    ) as left_motor, DRV8833(
+            IN_1_A=None, IN_2_A=None,
+            IN_1_B=IN_1_RIGHT, IN_2_B=IN_2_RIGHT,
+            ENABLE=7
+    ) as right_motor:
+        
+        # test both motors at the same time
+        for rate in frange(-1.0, 1.0, 0.1):
+            print('Both channels \tDirection {}\t Duty cycle {}'.format(
+                'forward' if rate > 0 else 'backward', round(rate, 2)))
+
+            # later on these methods will be enclosed into another class
+            # that will stream the channel for each write
+            left_motor.write('a', rate)
+            right_motor.write('b', rate)
+            sleep(1)
