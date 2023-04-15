@@ -101,12 +101,12 @@ class DRV8833:
                  pwm_rate: int = 1000):  # frequency
 
         # check, for each pair of pins, if they are both None or both not None
-        if IN_1_A is None ^ IN_2_A is None:  # one of the two is None while the other is not
+        if (IN_1_A is None) ^ (IN_2_A is None):  # one of the two is None while the other is not
             error_msg = 'Invalid pin configuration: {}, {}'.format(IN_1_A, IN_2_A)
             logger.error(error_msg)
             raise ValueError(error_msg)
 
-        if IN_1_B is None ^ IN_2_B is None:  # one of the two is None while the other is not
+        if (IN_1_B is None) ^ (IN_2_B is None):  # one of the two is None while the other is not
             error_msg = 'Invalid pin configuration: {}, {}'.format(IN_1_B, IN_2_B)
             logger.error(error_msg)
             raise ValueError(error_msg)
@@ -222,11 +222,13 @@ class DRV8833:
         # 98 is ascii lowercase b
 
         if isinstance(channel, str):
-            if channel.lower() == 'a' or channel.lower() == 'b':
-                return abs(chr(channel.lower()) - 97)
+            if channel.lower() == 'a':
+                return 0
+            elif channel.lower() == 'b':
+                return 1
 
         if isinstance(channel, int):
-            if channel.lower() == 0 or channel.lower() == 1:
+            if channel == 0 or channel == 1:
                 return channel
 
         # channel is not instance of int or string and is not 'a'/'b'/0/1
@@ -249,7 +251,7 @@ class DRV8833:
             PWM rate, float in range [-1.0, 1.0]
         """
 
-        if not isinstance(rate, float):
+        if not isinstance(rate, (int, float)):
             error_msg = 'Invalid modulation rate: {}'.format(rate)
             logger.error(error_msg)
             raise ValueError(error_msg)
@@ -304,15 +306,13 @@ class DRV8833:
             either 0 or 1 if int
         """
 
-        if (
-                not isinstance(decay, Decay) and
-                not isinstance(decay, str) and
-                not isinstance(decay, int)
-        ):
+        if not isinstance(decay, (Decay, str, int)):
             error_msg = 'Invalid decay specifier {} [class {}]'.format(decay, type(decay))
             logger.error(error_msg)
             raise ValueError(error_msg)
 
+        # check if, being the correct type, the decay variable is a valid
+        # decay string/integer
         if isinstance(decay, str) and (
                 decay.lower() != 'slow' and
                 decay.lower() != 'fast'
@@ -324,15 +324,15 @@ class DRV8833:
             logger.error(error_msg)
             raise ValueError(error_msg)
 
-        decay_str = ''
+        # logging
         if isinstance(decay, Decay):
             decay_str = 'SLOW' if decay == Decay.SLOW else 'FAST'
         elif isinstance(decay, int):
             decay_str = 'SLOW' if decay == 0 else 'FAST'
         else:  # isinstance(decay, str)
             decay_str = decay.upper()
-
         logger.info('Decay mode set to: {}'.format(decay_str))
+
         self.decay = decay
 
     def setSlowDecay(self):
@@ -417,63 +417,52 @@ class DRV8833:
         # (rate >/< 0)
         # outMin + (((value - inMin) / (inMax - inMin)) * (outMax - outMin))
         pwm = (abs(parsed_rate) * 100)
-        logger.debug('Rate {} converted to PWM value {}'.format(rate, pwm))
+        logger.debug('Rate {0:.2f} converted to PWM value {1:5.2f}'.format(rate, pwm))
 
-        if self.decay == Decay.FAST:
+        if self.decay == Decay.SLOW:
 
             if parsed_channel == 0:
-                if rate > 0:  # forward
+                if rate >= 0:  # forward
                     # dc is the duty cycle (0.0 <= dc <= 100.0)
                     self.pwm_1_A.ChangeDutyCycle(0)
                     self.pwm_2_A.ChangeDutyCycle(pwm)
-                elif rate < 0:  # backward
+                else:  # backward
                     self.pwm_1_A.ChangeDutyCycle(pwm)
-                    self.pwm_2_A.ChangeDutyCycle(0)
-                else:  # stop
-                    self.pwm_1_A.ChangeDutyCycle(0)
                     self.pwm_2_A.ChangeDutyCycle(0)
                 self.channel_A_rate = rate
 
             else:
-                if rate > 0:  # forward
+                if rate >= 0:  # forward
                     self.pwm_1_B.ChangeDutyCycle(pwm)
                     self.pwm_2_B.ChangeDutyCycle(0)
-                elif rate < 0:  # backward
+                else:  # backward
                     self.pwm_1_B.ChangeDutyCycle(0)
                     self.pwm_2_B.ChangeDutyCycle(pwm)
-                else:
-                    self.pwm_1_B.ChangeDutyCycle(0)
-                    self.pwm_2_B.ChangeDutyCycle(0)
                 self.channel_B_rate = rate
 
         else:
 
             if parsed_channel == 0:
-                if rate > 0:  # forward
-                    self.pwm_1_A.ChangeDutyCycle(pwm)
+                if rate >= 0:  # forward
+                    self.pwm_1_A.ChangeDutyCycle(100 - pwm)
                     self.pwm_2_A.ChangeDutyCycle(100)
-                elif rate < 0:  # backward
+                else:  # backward
                     self.pwm_1_A.ChangeDutyCycle(100)
-                    self.pwm_2_A.ChangeDutyCycle(pwm)
-                else:  # stop
-                    self.pwm_1_A.ChangeDutyCycle(0)
-                    self.pwm_2_A.ChangeDutyCycle(0)
+                    self.pwm_2_A.ChangeDutyCycle(100 - pwm)
                 self.channel_A_rate = rate
 
             else:
-                if rate > 0:  # forward
+                if rate >= 0:  # forward
                     self.pwm_1_B.ChangeDutyCycle(100)
-                    self.pwm_2_B.ChangeDutyCycle(pwm)
-                elif rate < 0:  # backward
-                    self.pwm_1_B.ChangeDutyCycle(pwm)
+                    self.pwm_2_B.ChangeDutyCycle(100 - pwm)
+                else:  # backward
+                    self.pwm_1_B.ChangeDutyCycle(100 - pwm)
                     self.pwm_2_B.ChangeDutyCycle(100)
-                else:
-                    self.pwm_1_B.ChangeDutyCycle(0)
-                    self.pwm_2_B.ChangeDutyCycle(0)
                 self.channel_B_rate = rate
 
-        logger.info('Channel {} {} at {}%'.format(
-            chr(parsed_channel + 65), 'forward' if rate > 0 else 'backward', pwm))
+        direction = 'forward' if rate > 0 else 'backward'
+        logger.info('Channel {0:s} {1:s} at {2:5.2f}%'.format(
+            chr(parsed_channel + 65), direction, pwm))
 
     def read(self, channel):
         """
@@ -567,7 +556,7 @@ if __name__ == '__main__':
 
     # create a logger instance
     logger = logging.getLogger('MAIN')
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
 
     # create a formatter instance
     formatter = logging.Formatter(
@@ -614,24 +603,38 @@ if __name__ == '__main__':
 
     # -------------------------------- actual test ------------------------------- #
 
+    import configparser
+
+    config = configparser.ConfigParser()
+    config.read('../../config/config.ini')
+
+    IN_1_LEFT = int(config['PINS']['IN_1_LEFT'])
+    IN_2_LEFT = int(config['PINS']['IN_2_LEFT'])
+    IN_1_RIGHT = int(config['PINS']['IN_1_RIGHT'])
+    IN_2_RIGHT = int(config['PINS']['IN_2_RIGHT'])
+    ENABLE = int(config['PINS']['ENABLE'])
+
     with DRV8833(
-            IN_1_B=21, IN_2_B=20,
-            IN_1_A=16, IN_2_A=12,
+            IN_1_A=IN_1_LEFT, IN_2_A=IN_2_LEFT,
+            IN_1_B=IN_1_RIGHT, IN_2_B=IN_2_RIGHT,
             ENABLE=7
     ) as motor_driver:
 
-        # 65 is ascii uppercase a
-        # 66 is ascii uppercase b
-        for i in range(65, 67):
-            channel = chr(i)
-            for rate in frange(-1.0, 1.0, 0.1):
+        motor_driver.setSlowDecay()
+        print('Decay: {}'.format(
+            'SLOW' if motor_driver.getDecayMode() == Decay.SLOW else 'FAST'
+        ))
+
+        for channel in range(2):
+
+            for rate in frange(-1.0, 1.1, 0.1):
                 print('Channel {}\tDirection {}\t Duty cycle {}'.format(
-                    channel, 'forward' if rate > 0 else 'backward', round(rate, 2)))
+                    chr(channel + 65), 'forward' if rate > 0 else 'backward', round(rate, 2)))
                 motor_driver.write(channel, rate)
                 sleep(1)
 
             # stop the motor, otherwise the last suitable rate is kept
-            print('Stopping channel {}'.format(channel))
+            print('Stopping channel {}'.format(chr(channel + 65)))
             motor_driver.write(channel, 0)
 
         # test both motors at the same time
@@ -642,9 +645,10 @@ if __name__ == '__main__':
             motor_driver.write('b', rate)
             sleep(1)
 
+        # stop the motor, otherwise the last suitable rate is kept
+        print('Stopping both channels')
+        motor_driver.write('a', 0)
+        motor_driver.write('b', 0)
+
     # the close() function is automatically called by __exit__()
     # once the with block ends
-
-    # stop the motor, otherwise the last suitable rate is kept
-    print('Stopping channel {}'.format(channel))
-    motor_driver.write(channel, 0)
