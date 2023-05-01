@@ -111,8 +111,10 @@ def main():
 
         # motors
         target_speed = 1.0
-        current_left_speed = target_speed
-        current_right_speed = target_speed
+        prev_left_speed = target_speed
+        prev_right_speed = target_speed
+        current_left_speed = prev_left_speed
+        current_right_speed = prev_right_speed
         left_motor.write('a', current_left_speed)
         right_motor.write('b', current_right_speed)
 
@@ -149,6 +151,8 @@ def main():
 
             return x / conversion_factor / poles
 
+        PID_enabled = True
+
         # main loop
         import time
         sampling_rate = 0.5  # update once every 0.5 seconds
@@ -166,15 +170,17 @@ def main():
             current_left_speed = RPM2speed(current_left_RPM)
             current_right_speed = RPM2speed(current_right_RPM)
 
-            # compute new speed
-            prev_left_speed = current_left_speed
-            current_left_speed = left_motor_PID.update(current_left_speed, target_speed)
+            if PID_enabled:
 
-            prev_right_speed = current_right_speed
-            current_right_speed = right_motor_PID.update(current_right_speed, target_speed)
+                # compute new speed
+                prev_left_speed = current_left_speed
+                current_left_speed = left_motor_PID.update(current_left_speed, target_speed)
 
-            left_motor.write('a', current_left_speed)
-            right_motor.write('b', current_right_speed)
+                prev_right_speed = current_right_speed
+                current_right_speed = right_motor_PID.update(current_right_speed, target_speed)
+
+                left_motor.write('a', current_left_speed)
+                right_motor.write('b', current_right_speed)
 
             # log the results
             result = 'Left ticks[{:5.2f}]\tRPM[{:5.2f}]\tprev_speed[{:5.2f}]\tcurr_speed[{:5.2f}]\t'        \
