@@ -165,8 +165,8 @@ if __name__ == '__main__':
 
     import time
 
-    sampling_rate = 0.1 # read the encoder value once every 0.1 seconds
-    sampling_time = 20 # read the encoder value for 10 seconds
+    sampling_rate = 0.1  # read the encoder value once every 0.1 seconds
+    sampling_time = 20  # read the encoder value for 10 seconds
 
     with Encoder(
         PIN_CLK=LEFT_ENC_CLK,
