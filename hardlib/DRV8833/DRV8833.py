@@ -289,7 +289,7 @@ class DRV8833:
         return GPIO.input(self.ENABLE)  # read the state
 
 
-    def setDacayMode(self, decay):
+    def setDecayMode(self, decay):
         """
         Set the decay mode. The decay mode in a motor refers to the way in 
         which the current in the motor windings is reduced when the motor 
