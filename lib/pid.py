@@ -48,7 +48,7 @@ class PID:
         error = target_speed - current_speed
 
         current_speed += (error * self.KP) + (self.prev_error * self.KD) + (self.sum_error * self.KI)
-        current_speed = max(min(1, current_speed), 0) # clamp the value between 0 and 1
+        current_speed = max(min(1, current_speed), 0)  # clamp the value between 0 and 1
         
         self.prev_error = error
         self.sum_error += error
