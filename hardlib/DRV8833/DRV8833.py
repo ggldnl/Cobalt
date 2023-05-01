@@ -487,8 +487,8 @@ class DRV8833:
 
         Parameters
         ----------
-        channel : int
-            0 for motor A, 1 for motor B
+        channel : int/str
+            0/'a'/'A' for motor A, 1/'b'/'B' for motor B
         
         Raises
         ------
@@ -690,7 +690,7 @@ if __name__ == '__main__':
 
             # stop the motor, otherwise the last suitable rate is kept
             print('Stopping channel {}'.format(chr(channel + 65)))
-            motor_driver.write(channel, 0)
+            motor_driver.stop(channel)
 
         # -------------------- test both channels at the same time ------------------- #
 
@@ -704,8 +704,8 @@ if __name__ == '__main__':
 
         # stop the motor, otherwise the last suitable rate is kept
         print('Stopping both channels')
-        motor_driver.write('a', 0)
-        motor_driver.write('b', 0)
+        motor_driver.stop('b')
+        motor_driver.stop('a')
 
     # the close() function is automatically called by __exit__()
     # once the with block ends
