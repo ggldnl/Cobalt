@@ -94,6 +94,7 @@ class DRV8833:
     # IN_1_B = 16, IN_2_B = 12
     # ENABLE = 7
     def __init__(self,
+                 # TODO: convert None to -1
                  IN_1_A: int, IN_2_A: int,  # control pins for left motor
                  IN_1_B: int, IN_2_B: int,  # control pins for right motor
                  ENABLE: int,  # control pin to enable the board
@@ -116,9 +117,11 @@ class DRV8833:
         self.channel_B_enabled = True
 
         if IN_1_A is None and IN_2_A is None:
+            logger.debug('Enabled channel B')
             self.channel_A_enabled = False
 
         if IN_1_B is None and IN_2_B is None:
+            logger.debug('Enabled channel A')
             self.channel_B_enabled = False
 
         # pins
@@ -670,7 +673,7 @@ if __name__ == '__main__':
     with DRV8833(
             IN_1_A=IN_1_LEFT, IN_2_A=IN_2_LEFT,
             IN_1_B=IN_1_RIGHT, IN_2_B=IN_2_RIGHT,
-            ENABLE=7
+            ENABLE=ENABLE
     ) as motor_driver:
 
         motor_driver.setSlowDecay()
@@ -715,11 +718,11 @@ if __name__ == '__main__':
     with DRV8833(
             IN_1_A=IN_1_LEFT, IN_2_A=IN_2_LEFT,
             IN_1_B=None, IN_2_B=None,
-            ENABLE=7
+            ENABLE=ENABLE
     ) as left_motor, DRV8833(
             IN_1_A=None, IN_2_A=None,
             IN_1_B=IN_1_RIGHT, IN_2_B=IN_2_RIGHT,
-            ENABLE=7
+            ENABLE=ENABLE
     ) as right_motor:
         
         # test both motors at the same time
