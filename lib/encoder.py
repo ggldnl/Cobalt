@@ -149,6 +149,18 @@ if __name__ == '__main__':
 
     logger.addHandler(handler)
 
+    # -------------------------------- parameters -------------------------------- #
+
+    import configparser
+
+    config = configparser.ConfigParser()
+    config.read('../config/config.ini')
+
+    LEFT_ENC_CLK = int(config['PINS']['LEFT_ENC_CLK'])
+    LEFT_ENC_DT = int(config['PINS']['LEFT_ENC_DT'])
+    RIGHT_ENC_CLK = int(config['PINS']['RIGHT_ENC_CLK'])
+    RIGHT_ENC_DT = int(config['PINS']['RIGHT_ENC_DT'])
+
     # -------------------------------- actual test ------------------------------- #
 
     import time
@@ -157,8 +169,8 @@ if __name__ == '__main__':
     sampling_time = 20 # read the encoder value for 10 seconds
 
     with Encoder(
-        PIN_CLK = 25,  # TODO fix
-        PIN_DT = 8
+        PIN_CLK=LEFT_ENC_CLK,
+        PIN_DT=LEFT_ENC_DT
     ) as encoder:
 
         t_end = time.time() + sampling_time
