@@ -285,6 +285,7 @@ class DRV8833:
         """
         return GPIO.input(self.ENABLE)  # read the state
 
+
     def setDacayMode(self, decay):
         """
         Set the decay mode. The decay mode in a motor refers to the way in 
@@ -337,6 +338,7 @@ class DRV8833:
 
         self.decay = decay
 
+
     def setSlowDecay(self):
         """
         Set the decay mode to SLOW
@@ -344,12 +346,14 @@ class DRV8833:
         logger.info('Decay mode set to: SLOW')
         self.decay = Decay.SLOW
 
+
     def setFastDecay(self):
         """
         Set the decay mode to FAST
         """
         logger.info('Decay mode set to: FAST')
         self.decay = Decay.FAST
+
 
     def getDecayMode(self):
         """
@@ -361,6 +365,7 @@ class DRV8833:
             the current decay mode.
         """
         return self.decay
+
 
     def write(self, channel, rate):
         """
@@ -474,6 +479,24 @@ class DRV8833:
         direction = 'forward' if rate > 0 else 'backward'
         logger.info('Channel {0:s} {1:s} at {2:5.2f}%'.format(
             chr(parsed_channel + 65), direction, pwm))
+        
+
+    def stop(self, channel):
+        """
+        Stops the PWM on the specified channel.
+
+        Parameters
+        ----------
+        channel : int
+            0 for motor A, 1 for motor B
+        
+        Raises
+        ------
+        ValueError
+            if the channel parameter is not a valid channel identifier.
+        """
+        self.write(channel, 0)
+
 
     def read(self, channel):
         """
@@ -513,10 +536,12 @@ class DRV8833:
 
         return self.channel_B_rate
 
+
     # The __enter__ method is called when a block of code is entered,
     # such as a with statement.
     def __enter__(self):
         return self
+
 
     def close(self):
         """
@@ -539,10 +564,14 @@ class DRV8833:
         # even the ones used in other modules
         # GPIO.cleanup()
         if self.channel_A_enabled:
+            self.pwm_1_A.stop()
+            self.pwm_2_A.stop()
             GPIO.setup(self.IN_1_A, GPIO.IN)
             GPIO.setup(self.IN_2_A, GPIO.IN)
 
         if self.channel_B_enabled:
+            self.pwm_1_B.stop()
+            self.pwm_2_B.stop()
             GPIO.setup(self.IN_1_B, GPIO.IN)
             GPIO.setup(self.IN_2_B, GPIO.IN)
 
