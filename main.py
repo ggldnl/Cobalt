@@ -1,10 +1,10 @@
 import logging
 
-from hardlib.DRV8833.DRV8833 import DRV8833
+from Cobalt.hardlib.DRV8833.DRV8833 import DRV8833
 from hardlib.VL53L0.VL53L0 import VL53L0
-from hardlib.MPU6050.MPU6050 import MPU6050
+from Cobalt.hardlib.MPU6050.MPU6050 import MPU6050
 
-from lib.encoder import Encoder
+from Cobalt.lib.Encoder.encoder import Encoder
 
 # ---------------------------------- logging --------------------------------- #
 

@@ -1,0 +1,4 @@
+# PiSugar3 python API
+
+As far as I know, the [pisugar-server-py package](https://github.com/PiSugar/pisugar-power-manager) is deprecated and only supports PiSugar2 and PiSugar2 Pro. The new standard [is written in Rust](https://github.com/PiSugar/pisugar-power-manager-rs) and includes support for the PiSugar3 aswell. We need to implement something similar in C++ in order to use it in ROS. Before doing so I rewrote [part of the core-library](https://github.com/PiSugar/pisugar-power-manager-rs/blob/master/pisugar-core/src/pisugar3.rs) in pyhton to understand how it works. This port is waaay simpler and includes only part of the functionality (rtc and logging are not supported at all). Some of the missing features won't make sense for a robot anyway.
+Keep in mind that I also changed some names.
