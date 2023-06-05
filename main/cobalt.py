@@ -106,12 +106,29 @@ if __name__ == '__main__':
     import time
     with Cobalt () as cobalt:
 
+        """
         # make a square
         for _ in range(4):
 
             cobalt.forward(distance = 50, speed = 50)
             cobalt.rotate_clockwise(angle = 90, speed = 50)
             time.sleep(1)
-
+        
         # make a circle
         # TODO
+        """
+        
+        msg = ''
+        while msg.lower() != 'exit':
+
+            cobalt.forward(distance=50, speed=50)
+            
+            msg = input()
+
+            try:
+                p, i, d = msg.split(' ')
+
+                cobalt.left_motor.pid.set_parameters(p, i, d)
+                cobalt.right_motor.pid.set_parameters(p, i, d)
+            except:
+                pass
