@@ -223,7 +223,7 @@ if __name__ == '__main__':
         )
 
     # create a handler instance
-    handler = logging.FileHandler('../../log/VL53L0X.log', 'w')
+    handler = logging.FileHandler('log/VL53L0X.log', 'w')
     # handler.setLevel(logging.DEBUG)
     handler.setFormatter(formatter)
 

@@ -1,28 +1,17 @@
 import RPi.GPIO as GPIO
-import logging
-
-# ---------------------------------- logging --------------------------------- #
-
-# create a logger instance
-logger = logging.getLogger('DRV8833')
-logger.setLevel(logging.DEBUG)
-
-# done this way bot to omit the FileHandler specification and to avoid
-# the logger to write MAIN.DRV8833 on the file. For some reason this
-# works
-parent_logger = logging.getLogger('MAIN')
-logger.parent = parent_logger
-
-# --------------------------- DRV8833 core library --------------------------- #
-
-
+from typing import Literal
+from typing import Union
 import enum
 
+
+# ---------------------------- decay mode selector --------------------------- #
 
 class Decay(enum.Enum):
     FAST = 0
     SLOW = 1
 
+
+# --------------------------- DRV8833 core library --------------------------- #
 
 class DRV8833:
     """
@@ -104,12 +93,10 @@ class DRV8833:
         # check, for each pair of pins, if they are both None or both not None
         if (IN_1_A is None) ^ (IN_2_A is None):  # one of the two is None while the other is not
             error_msg = 'Invalid pin configuration: {}, {}'.format(IN_1_A, IN_2_A)
-            logger.error(error_msg)
             raise ValueError(error_msg)
 
         if (IN_1_B is None) ^ (IN_2_B is None):  # one of the two is None while the other is not
             error_msg = 'Invalid pin configuration: {}, {}'.format(IN_1_B, IN_2_B)
-            logger.error(error_msg)
             raise ValueError(error_msg)
 
         # pins are ok
@@ -117,11 +104,9 @@ class DRV8833:
         self.channel_B_enabled = True
 
         if IN_1_A is None and IN_2_A is None:
-            logger.debug('Enabled channel B')
             self.channel_A_enabled = False
 
         if IN_1_B is None and IN_2_B is None:
-            logger.debug('Enabled channel A')
             self.channel_B_enabled = False
 
         # pins
@@ -131,21 +116,11 @@ class DRV8833:
         self.IN_2_B = IN_2_B
         self.ENABLE = ENABLE
 
-        logger.debug('IN_1_A set to {}'.format(IN_1_A))
-        logger.debug('IN_2_A set to {}'.format(IN_2_A))
-        logger.debug('IN_1_B set to {}'.format(IN_1_B))
-        logger.debug('IN_2_B set to {}'.format(IN_2_B))
-        logger.debug('ENABLE set to {}'.format(ENABLE))
-
         # frequency
         self.pwm_rate = pwm_rate
 
-        logger.debug('PWM frequency set to {}'.format(pwm_rate))
-
         # decay
         self.decay = decay
-
-        logger.debug('Decay mode set to {}'.format(decay))
 
         # channel A and B rate
         self.channel_A_rate = 0  # pwm rate for channel A
@@ -159,8 +134,6 @@ class DRV8833:
         and creating the pwm objects, one for each channel, with
         which the direction and speed of each channel is controlled.
         """
-
-        logger.info('Starting hardware setup')
 
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)  # init the library
@@ -178,7 +151,7 @@ class DRV8833:
         # self.enable()
 
         # we could have multiple instasnces of the DRV8833
-        # so we should first check if the enable pin is 
+        # so we should first check if the enable pin is
         # already in use
         if GPIO.gpio_function(18) != GPIO.OUT:
             self.enable()
@@ -197,87 +170,19 @@ class DRV8833:
             self.pwm_1_B.start(0)
             self.pwm_2_B.start(0)
 
-        logger.debug('Setup done')
-
-    def _parse_channel(self, channel):
-        """
-        Used to validate user input. Check if the channel is valid.
-        The channel can be specified using an integer (either 0 or 1)
-        or a string ('a','b','A','B'). If these conditions aren't met
-        an exception is raised.
-
-        Parameters
-        ----------
-        channel: int/str
-            input channel to check
-
-        Returns
-        -------
-            if the input is a valid channel specifier, return its
-            integer form:
-                if channel == 'a'
-                    return 0
-                elif channel == 'b'
-                    return 1.
-        """
-
-        # 65 is ascii uppercase a
-        # 66 is ascii uppercase b
-        # 97 is ascii lowercase a
-        # 98 is ascii lowercase b
-
-        if isinstance(channel, str):
-            if channel.lower() == 'a':
-                return 0
-            elif channel.lower() == 'b':
-                return 1
-
-        if isinstance(channel, int):
-            if channel == 0 or channel == 1:
-                return channel
-
-        # channel is not instance of int or string and is not 'a'/'b'/0/1
-
-        error_msg = 'Invalid channel identifier: {}'.format(channel)
-        logger.error(error_msg)
-        raise ValueError(error_msg)
-
-    def _parse_rate(self, rate):
-        """
-        Used to validate user input. Check if the rate is valid.
-        PWM rate must be a float inside [-1.0, 1.0] range.
-        Positive values are used to go forward;
-        Zero is used to stop the channel;
-        Negative values are used to go backward;
-
-        Parameters
-        ----------
-        rate: float
-            PWM rate, float in range [-1.0, 1.0]
-        """
-
-        if not isinstance(rate, (int, float)):
-            error_msg = 'Invalid modulation rate: {}'.format(rate)
-            logger.error(error_msg)
-            raise ValueError(error_msg)
-
-        return max(-1.0, min(1.0, rate))  # clip value
-
     def enable(self):
         """
         Enables the board.
         """
-        logger.info('Board enabled')
         GPIO.output(self.ENABLE, GPIO.HIGH)
 
     def disable(self):
         """
         Disables the board.
         """
-        logger.info('Board disabled')
         GPIO.output(self.ENABLE, GPIO.LOW)
 
-    def getStatus(self):
+    def get_status(self):
         """
         Tells if the board is enabled or disabled.
 
@@ -288,22 +193,21 @@ class DRV8833:
         """
         return GPIO.input(self.ENABLE)  # read the state
 
-
-    def setDecayMode(self, decay):
+    def set_decay_mode(self, decay):
         """
-        Set the decay mode. The decay mode in a motor refers to the way in 
-        which the current in the motor windings is reduced when the motor 
+        Set the decay mode. The decay mode in a motor refers to the way in
+        which the current in the motor windings is reduced when the motor
         is turned off.
-        
-        1. Fast decay mode (1): the current in the motor windings is rapidly 
-            reduced to zero when the power supply is turned off. This causes 
+
+        1. Fast decay mode (1): the current in the motor windings is rapidly
+            reduced to zero when the power supply is turned off. This causes
             the motor to quickly come to a stop.
 
-        2. Slow decay mode (0): the current in the motor windings is gradually 
-            reduced to zero over a longer period of time. This can cause 
-            the motor to continue rotating for a short period of time after 
+        2. Slow decay mode (0): the current in the motor windings is gradually
+            reduced to zero over a longer period of time. This can cause
+            the motor to continue rotating for a short period of time after
             the power supply is turned off.
-        
+
         Parameters
         ----------
         decay : Decay/str/int
@@ -314,7 +218,6 @@ class DRV8833:
 
         if not isinstance(decay, (Decay, str, int)):
             error_msg = 'Invalid decay specifier {} [class {}]'.format(decay, type(decay))
-            logger.error(error_msg)
             raise ValueError(error_msg)
 
         # check if, being the correct type, the decay variable is a valid
@@ -327,7 +230,6 @@ class DRV8833:
                 decay != 1
         ):
             error_msg = 'Invalid decay mode: {}'.format(decay)
-            logger.error(error_msg)
             raise ValueError(error_msg)
 
         # logging
@@ -337,28 +239,22 @@ class DRV8833:
             decay_str = 'SLOW' if decay == 0 else 'FAST'
         else:  # isinstance(decay, str)
             decay_str = decay.upper()
-        logger.info('Decay mode set to: {}'.format(decay_str))
 
         self.decay = decay
 
-
-    def setSlowDecay(self):
+    def set_slow_decay(self):
         """
         Set the decay mode to SLOW
         """
-        logger.info('Decay mode set to: SLOW')
         self.decay = Decay.SLOW
 
-
-    def setFastDecay(self):
+    def set_dast_decay(self):
         """
         Set the decay mode to FAST
         """
-        logger.info('Decay mode set to: FAST')
         self.decay = Decay.FAST
 
-
-    def getDecayMode(self):
+    def get_decay_mode(self):
         """
         Get the current decay mode.
 
@@ -369,8 +265,7 @@ class DRV8833:
         """
         return self.decay
 
-
-    def write(self, channel, rate):
+    def write(self, _channel: Literal['a', 'b', 'A', 'B', 1, 0], _rate: Union[int, float]):
         """
         Set the speed and direction on a single motor channel. The speed and
         direction for each channel is set according to the following tables:
@@ -400,97 +295,83 @@ class DRV8833:
 
         Parameters
         ----------
-        channel : int/str
+        _channel : int/str
             0/'a'/'A' for motor A, 1/'b'/'B' for motor B
-        rate : float
+        _rate : float
             modulation value between -1.0 and 1.0, full reverse to full forward.
             0 stops the motor.
-            
+
         Raises
         ------
         ValueError
-            either if the channel identifier is invalid or the modulation rate 
+            either if the channel identifier is invalid or the modulation rate
             is out of bounds.
         """
 
-        # check the channel
-        parsed_channel = self._parse_channel(channel)
-
         # check if the channel is enabled
         if (
-                channel == 0 and not self.channel_A_enabled or
-                channel == 1 and not self.channel_B_enabled
-            ):
-            error_msg = 'Channel {0:s} is not enabled'.format(chr(parsed_channel + 65))
-            logger.error(error_msg)
+                _channel == 0 and not self.channel_A_enabled or
+                _channel == 1 and not self.channel_B_enabled
+        ):
+            error_msg = 'Channel {0:s} is not enabled'.format(chr(_channel + 65))
             raise ValueError(error_msg)
 
-        # check the modulation rate
-        parsed_rate = self._parse_rate(rate)
-
         # clip the rate value between -1.0 and 1.0
-        # rate = round(rate, 2)
-        # rate = max(-1.0, min(1.0, rate))
+        _rate = max(-1.0, min(1.0, _rate))  # clip value
 
         # convert the rate (range [-1.0, 0.0]) into percentage and direction 
         # (rate >/< 0)
         # outMin + (((value - inMin) / (inMax - inMin)) * (outMax - outMin))
-        pwm = (abs(parsed_rate) * 100)
-        logger.debug('Rate {0:.2f} converted to PWM value {1:5.2f}'.format(rate, pwm))
+        pwm = (abs(_rate) * 100)
 
         if self.decay == Decay.SLOW:
 
-            if parsed_channel == 0:
-                if rate >= 0:  # forward
+            if _channel == 0:
+                if _rate >= 0:  # forward
                     # dc is the duty cycle (0.0 <= dc <= 100.0)
                     self.pwm_1_A.ChangeDutyCycle(0)
                     self.pwm_2_A.ChangeDutyCycle(pwm)
                 else:  # backward
                     self.pwm_1_A.ChangeDutyCycle(pwm)
                     self.pwm_2_A.ChangeDutyCycle(0)
-                self.channel_A_rate = rate
+                self.channel_A_rate = _rate
 
             else:
-                if rate >= 0:  # forward
+                if _rate >= 0:  # forward
                     self.pwm_1_B.ChangeDutyCycle(pwm)
                     self.pwm_2_B.ChangeDutyCycle(0)
                 else:  # backward
                     self.pwm_1_B.ChangeDutyCycle(0)
                     self.pwm_2_B.ChangeDutyCycle(pwm)
-                self.channel_B_rate = rate
+                self.channel_B_rate = _rate
 
         else:
 
-            if parsed_channel == 0:
-                if rate >= 0:  # forward
+            if _channel == 0:
+                if _rate >= 0:  # forward
                     self.pwm_1_A.ChangeDutyCycle(100 - pwm)
                     self.pwm_2_A.ChangeDutyCycle(100)
                 else:  # backward
                     self.pwm_1_A.ChangeDutyCycle(100)
                     self.pwm_2_A.ChangeDutyCycle(100 - pwm)
-                self.channel_A_rate = rate
+                self.channel_A_rate = _rate
 
             else:
-                if rate >= 0:  # forward
+                if _rate >= 0:  # forward
                     self.pwm_1_B.ChangeDutyCycle(100)
                     self.pwm_2_B.ChangeDutyCycle(100 - pwm)
                 else:  # backward
                     self.pwm_1_B.ChangeDutyCycle(100 - pwm)
                     self.pwm_2_B.ChangeDutyCycle(100)
-                self.channel_B_rate = rate
+                self.channel_B_rate = _rate
 
-        direction = 'forward' if rate > 0 else 'backward'
-        logger.info('Channel {0:s} {1:s} at {2:5.2f}%'.format(
-            chr(parsed_channel + 65), direction, pwm))
-        
-
-    def stop(self, channel):
+    def stop(self, _channel):
         """
         Stops the PWM on the specified channel.
 
         Parameters
         ----------
-        channel : int/str
+        _channel : int/str
             0/'a'/'A' for motor A, 1/'b'/'B' for motor B
         
         Raises
@@ -498,16 +379,15 @@ class DRV8833:
         ValueError
             if the channel parameter is not a valid channel identifier.
         """
-        self.write(channel, 0)
+        self.write(_channel, 0)
 
-
-    def read(self, channel):
+    def read(self, _channel):
         """
         Read the speed and direction on a single motor channel.
 
         Parameters
         ----------
-        channel : int
+        _channel : int
             0 for motor A, 1 for motor B
         
         Returns
@@ -522,29 +402,23 @@ class DRV8833:
 
         """
 
-        # check if the channel is correctly formatted and return the channel as int
-        parsed_channel = self._parse_channel(channel)
-
         # check if the channel is enabled
         if (
-                channel == 0 and not self.channel_A_enabled or
-                channel == 1 and not self.channel_B_enabled
-            ):
-            error_msg = 'Channel {0:s} is not enabled'.format(chr(parsed_channel + 65))
-            logger.error(error_msg)
+                _channel == 0 and not self.channel_A_enabled or
+                _channel == 1 and not self.channel_B_enabled
+        ):
+            error_msg = 'Channel {0:s} is not enabled'.format(chr(_channel + 65))
             raise ValueError(error_msg)
 
-        if parsed_channel == 0:
+        if _channel == 0:
             return self.channel_A_rate
 
         return self.channel_B_rate
-
 
     # The __enter__ method is called when a block of code is entered,
     # such as a with statement.
     def __enter__(self):
         return self
-
 
     def close(self):
         """
@@ -561,7 +435,6 @@ class DRV8833:
         an error or Keyboard Interrupt will stay set exactly as they were, 
         even after the program exits.
         """
-        logger.info('GPIO cleanup')
 
         # calling GPIO.cleanup() will affect all the pins,
         # even the ones used in other modules
@@ -593,7 +466,6 @@ class DRV8833:
     def __exit__(self, exc_type, exc_value, tb):
 
         if exc_type is not None:
-            logger.error('Exception during call to __exit__: {}'.format(exc_type))
             return False
 
         self.close()
@@ -607,25 +479,6 @@ class DRV8833:
 if __name__ == '__main__':
 
     from time import sleep
-
-    # ------------------------------- logger setup ------------------------------- #
-
-    # create a logger instance
-    logger = logging.getLogger('MAIN')
-    logger.setLevel(logging.DEBUG)
-
-    # create a formatter instance
-    formatter = logging.Formatter(
-        '%(asctime)s\t%(name)s\t%(levelname)s\t%(message)s'
-    )
-
-    # create a handler instance
-    handler = logging.FileHandler('../../log/DRV8833.log', 'w')
-    # handler.setLevel(logging.DEBUG)
-    handler.setFormatter(formatter)
-
-    logger.addHandler(handler)
-
 
     # --------------------------- float range generator -------------------------- #
 
@@ -659,16 +512,13 @@ if __name__ == '__main__':
 
     # -------------------------------- actual test ------------------------------- #
 
-    import configparser
+    import config
 
-    config = configparser.ConfigParser()
-    config.read('../../config/config.ini')
-
-    IN_1_LEFT = int(config['PINS']['IN_1_LEFT'])
-    IN_2_LEFT = int(config['PINS']['IN_2_LEFT'])
-    IN_1_RIGHT = int(config['PINS']['IN_1_RIGHT'])
-    IN_2_RIGHT = int(config['PINS']['IN_2_RIGHT'])
-    ENABLE = int(config['PINS']['ENABLE'])
+    IN_1_LEFT = 21
+    IN_2_LEFT = 20
+    IN_1_RIGHT = 16
+    IN_2_RIGHT = 12
+    ENABLE = 7
 
     with DRV8833(
             IN_1_A=IN_1_LEFT, IN_2_A=IN_2_LEFT,

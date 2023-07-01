@@ -186,7 +186,7 @@ if __name__ == '__main__':
         )
 
     # create a handler instance
-    handler = logging.FileHandler('../../log/MPU6050.log', 'w')
+    handler = logging.FileHandler('log/MPU6050.log', 'w')
     # handler.setLevel(logging.DEBUG)
     handler.setFormatter(formatter)
 
