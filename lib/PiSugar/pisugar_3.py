@@ -16,13 +16,13 @@ class PiSugar3:
 		# I2C info
 		self.I2C_BUS = 1
 		self.I2C_ADDRESS  = 0x57
-		self.I2C_CMD_VH   = 0x22 # voltage high byte
-		self.I2C_CMD_VL   = 0x23 # voltage low byte
-		self.I2C_CMD_IH   = 0x26 # current high byte
-		self.I2C_CMD_IL   = 0x27 # current low byte
-		self.I2C_CMD_TEMP = 0x04 # temperature
-		self.I2C_CMD_CTR1 = 0x02 # global ctrl 1
-		self.I2C_CMD_CTR2 = 0x03 # global ctrl 2
+		self.I2C_CMD_VH   = 0x22  # voltage high byte
+		self.I2C_CMD_VL   = 0x23  # voltage low byte
+		self.I2C_CMD_IH   = 0x26  # current high byte
+		self.I2C_CMD_IL   = 0x27  # current low byte
+		self.I2C_CMD_TEMP = 0x04  # temperature
+		self.I2C_CMD_CTR1 = 0x02  # global ctrl 1
+		self.I2C_CMD_CTR2 = 0x03  # global ctrl 2
 
 		# with SMBus(I2C_BUS) as bus: remember to close it
 		self._bus = SMBus(self.I2C_BUS)
