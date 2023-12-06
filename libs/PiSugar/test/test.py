@@ -1,3 +1,7 @@
+
+# quick and dirty test script to check if we can get readings
+# from the pisugar
+
 from smbus2 import SMBus
 
 I2C_BUS = 1
@@ -8,9 +12,9 @@ I2C_CMD_IH  = 0x26 # current high byte
 I2C_CMD_IL  = 0x27 # current low byte
 
 def look_for_device_address(address):
-	'''
+	"""
 	Checks if a device with the specified address is connected
-	'''
+	"""
 	with SMBus(I2C_BUS) as bus:
 		is_device_found = False
 		for device in range(128):
@@ -25,43 +29,43 @@ def look_for_device_address(address):
 		return is_device_found
 
 def read_battery_i():
-	'''
+	"""
 	Reads the current drawn in mA
-	'''
+	"""
 	with SMBus(I2C_BUS) as bus:
 		ih = bus.read_byte_data(I2C_ADDRESS, I2C_CMD_IH) # stored as int (32 bit)
 		il = bus.read_byte_data(I2C_ADDRESS, I2C_CMD_IL)
 		i = (ih << 8) | il # no worries shifting
 		return i
 	
-def current ():
-	'''
+def get_current ():
+	"""
 	Returns the current draw in Amps
-	'''
+	"""
 	i = read_battery_i ()
 	return i / 1000.0
 
 def read_battery_v():
-	'''
+	"""
 	Returns the battery voltage in mA
-	'''
+	"""
 	with SMBus(I2C_BUS) as bus:
 		vh = bus.read_byte_data(I2C_ADDRESS, I2C_CMD_VH) # stored as int (32 bit)
 		vl = bus.read_byte_data(I2C_ADDRESS, I2C_CMD_VL)
 		v = (vh << 8) | vl # no worries shifting
 		return v
 
-def voltage ():
-	'''
+def get_voltage ():
+	"""
 	Returns the voltage [V]
-	'''
+	"""
 	v = read_battery_v ()
 	return v / 1000.0
 
 def convert_battery_voltage_to_level (battery_voltage, battery_curve):
-	'''
+	"""
 	Returns the battery percentage given the battery voltage curve
-	'''
+	"""
 	for i in range(len(battery_curve)):
 		voltage_low = battery_curve[i][0]
 		level_low 	= battery_curve[i][1]
@@ -75,10 +79,10 @@ def convert_battery_voltage_to_level (battery_voltage, battery_curve):
 				return level_low + percent * (level_high - level_low)
 	return 0.0
 
-def battery_percent(battery_voltage):
-	'''
+def get_percent():
+	"""
 	Returns the battery percentage for the PiSugar3/PiSugar2 Pro (?)
-	'''
+	"""
 	battery_curve = [
 		[4.10, 100.0],
 		[4.05, 95.0],
@@ -92,14 +96,14 @@ def battery_percent(battery_voltage):
 		[3.1, 0.0],
 	]
 	battery_level = 100.0
+	battery_voltage = get_voltage()
 	if battery_voltage > 0.0:
 		battery_level = convert_battery_voltage_to_level(battery_voltage, battery_curve)
 	return battery_level
 
 if __name__ == '__main__':
 
-	v = voltage()
-	p = battery_percent(v)
-
-	print('battery voltage [V]:\t', v)
-	print('battery percent [%]:\t', p)
+	v = get_voltage()
+	p = get_percent()
+	print(f'Battery percentage :{v}')
+	print(f'Battery voltage [V]:{p}%')

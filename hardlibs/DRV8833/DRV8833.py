@@ -1,28 +1,17 @@
 import RPi.GPIO as GPIO
-import logging
-
-# ---------------------------------- logging --------------------------------- #
-
-# create a logger instance
-logger = logging.getLogger('DRV8833')
-logger.setLevel(logging.DEBUG)
-
-# done this way bot to omit the FileHandler specification and to avoid
-# the logger to write MAIN.DRV8833 on the file. For some reason this
-# works
-parent_logger = logging.getLogger('MAIN')
-logger.parent = parent_logger
-
-# --------------------------- DRV8833 core library --------------------------- #
-
-
+from typing import Literal
+from typing import Union
 import enum
 
+
+# ---------------------------- decay mode selector --------------------------- #
 
 class Decay(enum.Enum):
     FAST = 0
     SLOW = 1
 
+
+# --------------------------- DRV8833 core library --------------------------- #
 
 class DRV8833:
     """
@@ -94,6 +83,7 @@ class DRV8833:
     # IN_1_B = 16, IN_2_B = 12
     # ENABLE = 7
     def __init__(self,
+                 # TODO: convert None to -1
                  IN_1_A: int, IN_2_A: int,  # control pins for left motor
                  IN_1_B: int, IN_2_B: int,  # control pins for right motor
                  ENABLE: int,  # control pin to enable the board
@@ -101,14 +91,12 @@ class DRV8833:
                  pwm_rate: int = 1000):  # frequency
 
         # check, for each pair of pins, if they are both None or both not None
-        if IN_1_A is None ^ IN_2_A is None:  # one of the two is None while the other is not
+        if (IN_1_A is None) ^ (IN_2_A is None):  # one of the two is None while the other is not
             error_msg = 'Invalid pin configuration: {}, {}'.format(IN_1_A, IN_2_A)
-            logger.error(error_msg)
             raise ValueError(error_msg)
 
-        if IN_1_B is None ^ IN_2_B is None:  # one of the two is None while the other is not
+        if (IN_1_B is None) ^ (IN_2_B is None):  # one of the two is None while the other is not
             error_msg = 'Invalid pin configuration: {}, {}'.format(IN_1_B, IN_2_B)
-            logger.error(error_msg)
             raise ValueError(error_msg)
 
         # pins are ok
@@ -128,21 +116,11 @@ class DRV8833:
         self.IN_2_B = IN_2_B
         self.ENABLE = ENABLE
 
-        logger.debug('IN_1_A set to {}'.format(IN_1_A))
-        logger.debug('IN_2_A set to {}'.format(IN_2_A))
-        logger.debug('IN_1_B set to {}'.format(IN_1_B))
-        logger.debug('IN_2_B set to {}'.format(IN_2_B))
-        logger.debug('ENABLE set to {}'.format(ENABLE))
-
         # frequency
         self.pwm_rate = pwm_rate
 
-        logger.debug('PWM frequency set to {}'.format(pwm_rate))
-
         # decay
         self.decay = decay
-
-        logger.debug('Decay mode set to {}'.format(decay))
 
         # channel A and B rate
         self.channel_A_rate = 0  # pwm rate for channel A
@@ -157,16 +135,15 @@ class DRV8833:
         which the direction and speed of each channel is controlled.
         """
 
-        logger.info('Starting hardware setup')
-
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)  # init the library
 
-        # TODO check if a None raises an exception
-        GPIO.setup(self.IN_1_A, GPIO.OUT)
-        GPIO.setup(self.IN_2_A, GPIO.OUT)
-        GPIO.setup(self.IN_1_B, GPIO.OUT)
-        GPIO.setup(self.IN_2_B, GPIO.OUT)
+        if self.channel_A_enabled:
+            GPIO.setup(self.IN_1_A, GPIO.OUT)
+            GPIO.setup(self.IN_2_A, GPIO.OUT)
+        if self.channel_B_enabled:
+            GPIO.setup(self.IN_1_B, GPIO.OUT)
+            GPIO.setup(self.IN_2_B, GPIO.OUT)
         GPIO.setup(self.ENABLE, GPIO.OUT)
 
         # enable the board pulling self.ENABLE HIGH
@@ -174,103 +151,38 @@ class DRV8833:
         # self.enable()
 
         # we could have multiple instasnces of the DRV8833
-        # so we should first check if the enable pin is 
+        # so we should first check if the enable pin is
         # already in use
         if GPIO.gpio_function(18) != GPIO.OUT:
             self.enable()
 
         # create a PWM instance:
         # p = GPIO.PWM(channel, frequency)
-        # TODO check if a None raises an exception
-        self.pwm_1_A = GPIO.PWM(self.IN_1_A, self.pwm_rate)
-        self.pwm_2_A = GPIO.PWM(self.IN_2_A, self.pwm_rate)
-        self.pwm_1_B = GPIO.PWM(self.IN_1_B, self.pwm_rate)
-        self.pwm_2_B = GPIO.PWM(self.IN_2_B, self.pwm_rate)
+        if self.channel_A_enabled:
+            self.pwm_1_A = GPIO.PWM(self.IN_1_A, self.pwm_rate)
+            self.pwm_2_A = GPIO.PWM(self.IN_2_A, self.pwm_rate)
+            self.pwm_1_A.start(0)
+            self.pwm_2_A.start(0)
 
-        self.pwm_1_A.start(0)
-        self.pwm_2_A.start(0)
-        self.pwm_1_B.start(0)
-        self.pwm_2_B.start(0)
-
-        logger.debug('Setup done')
-
-    def _parse_channel(self, channel):
-        """
-        Used to validate user input. Check if the channel is valid.
-        The channel can be specified using an integer (either 0 or 1)
-        or a string ('a','b','A','B'). If these conditions aren't met
-        an exception is raised.
-
-        Parameters
-        ----------
-        channel: int/str
-            input channel to check
-
-        Returns
-        -------
-            if the input is a valid channel specifier, return its
-            integer form:
-                if channel == 'a'
-                    return 0
-                elif channel == 'b'
-                    return 1.
-        """
-
-        # 65 is ascii uppercase a
-        # 66 is ascii uppercase b
-        # 97 is ascii lowercase a
-        # 98 is ascii lowercase b
-
-        if isinstance(channel, str):
-            if channel.lower() == 'a' or channel.lower() == 'b':
-                return abs(chr(channel.lower()) - 97)
-
-        if isinstance(channel, int):
-            if channel.lower() == 0 or channel.lower() == 1:
-                return channel
-
-        # channel is not instance of int or string and is not 'a'/'b'/0/1
-
-        error_msg = 'Invalid channel identifier: {}'.format(channel)
-        logger.error(error_msg)
-        raise ValueError(error_msg)
-
-    def _parse_rate(self, rate):
-        """
-        Used to validate user input. Check if the rate is valid.
-        PWM rate must be a float inside [-1.0, 1.0] range.
-        Positive values are used to go forward;
-        Zero is used to stop the channel;
-        Negative values are used to go backward;
-
-        Parameters
-        ----------
-        rate: float
-            PWM rate, float in range [-1.0, 1.0]
-        """
-
-        if not isinstance(rate, float):
-            error_msg = 'Invalid modulation rate: {}'.format(rate)
-            logger.error(error_msg)
-            raise ValueError(error_msg)
-
-        return max(-1.0, min(1.0, rate))  # clip value
+        if self.channel_B_enabled:
+            self.pwm_1_B = GPIO.PWM(self.IN_1_B, self.pwm_rate)
+            self.pwm_2_B = GPIO.PWM(self.IN_2_B, self.pwm_rate)
+            self.pwm_1_B.start(0)
+            self.pwm_2_B.start(0)
 
     def enable(self):
         """
         Enables the board.
         """
-        logger.info('Board enabled')
         GPIO.output(self.ENABLE, GPIO.HIGH)
 
     def disable(self):
         """
         Disables the board.
         """
-        logger.info('Board disabled')
         GPIO.output(self.ENABLE, GPIO.LOW)
 
-    def getStatus(self):
+    def get_status(self):
         """
         Tells if the board is enabled or disabled.
 
@@ -281,21 +193,21 @@ class DRV8833:
         """
         return GPIO.input(self.ENABLE)  # read the state
 
-    def setDacayMode(self, decay):
+    def set_decay_mode(self, decay):
         """
-        Set the decay mode. The decay mode in a motor refers to the way in 
-        which the current in the motor windings is reduced when the motor 
+        Set the decay mode. The decay mode in a motor refers to the way in
+        which the current in the motor windings is reduced when the motor
         is turned off.
-        
-        1. Fast decay mode (1): the current in the motor windings is rapidly 
-            reduced to zero when the power supply is turned off. This causes 
+
+        1. Fast decay mode (1): the current in the motor windings is rapidly
+            reduced to zero when the power supply is turned off. This causes
             the motor to quickly come to a stop.
 
-        2. Slow decay mode (0): the current in the motor windings is gradually 
-            reduced to zero over a longer period of time. This can cause 
-            the motor to continue rotating for a short period of time after 
+        2. Slow decay mode (0): the current in the motor windings is gradually
+            reduced to zero over a longer period of time. This can cause
+            the motor to continue rotating for a short period of time after
             the power supply is turned off.
-        
+
         Parameters
         ----------
         decay : Decay/str/int
@@ -304,15 +216,12 @@ class DRV8833:
             either 0 or 1 if int
         """
 
-        if (
-                not isinstance(decay, Decay) and
-                not isinstance(decay, str) and
-                not isinstance(decay, int)
-        ):
+        if not isinstance(decay, (Decay, str, int)):
             error_msg = 'Invalid decay specifier {} [class {}]'.format(decay, type(decay))
-            logger.error(error_msg)
             raise ValueError(error_msg)
 
+        # check if, being the correct type, the decay variable is a valid
+        # decay string/integer
         if isinstance(decay, str) and (
                 decay.lower() != 'slow' and
                 decay.lower() != 'fast'
@@ -321,10 +230,9 @@ class DRV8833:
                 decay != 1
         ):
             error_msg = 'Invalid decay mode: {}'.format(decay)
-            logger.error(error_msg)
             raise ValueError(error_msg)
 
-        decay_str = ''
+        # logging
         if isinstance(decay, Decay):
             decay_str = 'SLOW' if decay == Decay.SLOW else 'FAST'
         elif isinstance(decay, int):
@@ -332,24 +240,21 @@ class DRV8833:
         else:  # isinstance(decay, str)
             decay_str = decay.upper()
 
-        logger.info('Decay mode set to: {}'.format(decay_str))
         self.decay = decay
 
-    def setSlowDecay(self):
+    def set_slow_decay(self):
         """
         Set the decay mode to SLOW
         """
-        logger.info('Decay mode set to: SLOW')
         self.decay = Decay.SLOW
 
-    def setFastDecay(self):
+    def set_dast_decay(self):
         """
         Set the decay mode to FAST
         """
-        logger.info('Decay mode set to: FAST')
         self.decay = Decay.FAST
 
-    def getDecayMode(self):
+    def get_decay_mode(self):
         """
         Get the current decay mode.
 
@@ -360,7 +265,7 @@ class DRV8833:
         """
         return self.decay
 
-    def write(self, channel, rate):
+    def write(self, _channel: Literal['a', 'b', 'A', 'B', 1, 0], _rate: Union[int, float]):
         """
         Set the speed and direction on a single motor channel. The speed and
         direction for each channel is set according to the following tables:
@@ -390,98 +295,99 @@ class DRV8833:
 
         Parameters
         ----------
-        channel : int/str
+        _channel : int/str
             0/'a'/'A' for motor A, 1/'b'/'B' for motor B
-        rate : float
+        _rate : float
             modulation value between -1.0 and 1.0, full reverse to full forward.
             0 stops the motor.
-            
+
         Raises
         ------
         ValueError
-            either if the channel identifier is invalid or the modulation rate 
+            either if the channel identifier is invalid or the modulation rate
             is out of bounds.
         """
 
-        # check the channel
-        parsed_channel = self._parse_channel(channel)
-
-        # check the modulation rate
-        parsed_rate = self._parse_rate(rate)
+        # check if the channel is enabled
+        if (
+                _channel == 0 and not self.channel_A_enabled or
+                _channel == 1 and not self.channel_B_enabled
+        ):
+            error_msg = 'Channel {0:s} is not enabled'.format(chr(_channel + 65))
+            raise ValueError(error_msg)
 
         # clip the rate value between -1.0 and 1.0
-        # rate = round(rate, 2)
-        # rate = max(-1.0, min(1.0, rate))
+        _rate = max(-1.0, min(1.0, _rate))  # clip value
 
         # convert the rate (range [-1.0, 0.0]) into percentage and direction 
         # (rate >/< 0)
         # outMin + (((value - inMin) / (inMax - inMin)) * (outMax - outMin))
-        pwm = (abs(parsed_rate) * 100)
-        logger.debug('Rate {} converted to PWM value {}'.format(rate, pwm))
+        pwm = (abs(_rate) * 100)
 
-        if self.decay == Decay.FAST:
+        if self.decay == Decay.SLOW:
 
-            if parsed_channel == 0:
-                if rate > 0:  # forward
+            if _channel == 0:
+                if _rate >= 0:  # forward
                     # dc is the duty cycle (0.0 <= dc <= 100.0)
                     self.pwm_1_A.ChangeDutyCycle(0)
                     self.pwm_2_A.ChangeDutyCycle(pwm)
-                elif rate < 0:  # backward
+                else:  # backward
                     self.pwm_1_A.ChangeDutyCycle(pwm)
                     self.pwm_2_A.ChangeDutyCycle(0)
-                else:  # stop
-                    self.pwm_1_A.ChangeDutyCycle(0)
-                    self.pwm_2_A.ChangeDutyCycle(0)
-                self.channel_A_rate = rate
+                self.channel_A_rate = _rate
 
             else:
-                if rate > 0:  # forward
+                if _rate >= 0:  # forward
                     self.pwm_1_B.ChangeDutyCycle(pwm)
                     self.pwm_2_B.ChangeDutyCycle(0)
-                elif rate < 0:  # backward
+                else:  # backward
                     self.pwm_1_B.ChangeDutyCycle(0)
                     self.pwm_2_B.ChangeDutyCycle(pwm)
-                else:
-                    self.pwm_1_B.ChangeDutyCycle(0)
-                    self.pwm_2_B.ChangeDutyCycle(0)
-                self.channel_B_rate = rate
+                self.channel_B_rate = _rate
 
         else:
 
-            if parsed_channel == 0:
-                if rate > 0:  # forward
-                    self.pwm_1_A.ChangeDutyCycle(pwm)
+            if _channel == 0:
+                if _rate >= 0:  # forward
+                    self.pwm_1_A.ChangeDutyCycle(100 - pwm)
                     self.pwm_2_A.ChangeDutyCycle(100)
-                elif rate < 0:  # backward
+                else:  # backward
                     self.pwm_1_A.ChangeDutyCycle(100)
-                    self.pwm_2_A.ChangeDutyCycle(pwm)
-                else:  # stop
-                    self.pwm_1_A.ChangeDutyCycle(0)
-                    self.pwm_2_A.ChangeDutyCycle(0)
-                self.channel_A_rate = rate
+                    self.pwm_2_A.ChangeDutyCycle(100 - pwm)
+                self.channel_A_rate = _rate
 
             else:
-                if rate > 0:  # forward
+                if _rate >= 0:  # forward
                     self.pwm_1_B.ChangeDutyCycle(100)
-                    self.pwm_2_B.ChangeDutyCycle(pwm)
-                elif rate < 0:  # backward
-                    self.pwm_1_B.ChangeDutyCycle(pwm)
+                    self.pwm_2_B.ChangeDutyCycle(100 - pwm)
+                else:  # backward
+                    self.pwm_1_B.ChangeDutyCycle(100 - pwm)
                     self.pwm_2_B.ChangeDutyCycle(100)
-                else:
-                    self.pwm_1_B.ChangeDutyCycle(0)
-                    self.pwm_2_B.ChangeDutyCycle(0)
-                self.channel_B_rate = rate
+                self.channel_B_rate = _rate
 
-        logger.info('Channel {} {} at {}%'.format(
-            chr(parsed_channel + 65), 'forward' if rate > 0 else 'backward', pwm))
+    def stop(self, _channel):
+        """
+        Stops the PWM on the specified channel.
 
-    def read(self, channel):
+        Parameters
+        ----------
+        _channel : int/str
+            0/'a'/'A' for motor A, 1/'b'/'B' for motor B
+        
+        Raises
+        ------
+        ValueError
+            if the channel parameter is not a valid channel identifier.
+        """
+        self.write(_channel, 0)
+
+    def read(self, _channel):
         """
         Read the speed and direction on a single motor channel.
 
         Parameters
         ----------
-        channel : int
+        _channel : int
             0 for motor A, 1 for motor B
         
         Returns
@@ -496,10 +402,15 @@ class DRV8833:
 
         """
 
-        # check if the channel is correctly formatted and return the channel as int
-        parsed_channel = self._parse_channel(channel)
+        # check if the channel is enabled
+        if (
+                _channel == 0 and not self.channel_A_enabled or
+                _channel == 1 and not self.channel_B_enabled
+        ):
+            error_msg = 'Channel {0:s} is not enabled'.format(chr(_channel + 65))
+            raise ValueError(error_msg)
 
-        if parsed_channel == 0:
+        if _channel == 0:
             return self.channel_A_rate
 
         return self.channel_B_rate
@@ -524,15 +435,22 @@ class DRV8833:
         an error or Keyboard Interrupt will stay set exactly as they were, 
         even after the program exits.
         """
-        logger.info('GPIO cleanup')
 
         # calling GPIO.cleanup() will affect all the pins,
         # even the ones used in other modules
         # GPIO.cleanup()
-        GPIO.setup(self.IN_1_A, GPIO.IN)
-        GPIO.setup(self.IN_1_B, GPIO.IN)
-        GPIO.setup(self.IN_2_A, GPIO.IN)
-        GPIO.setup(self.IN_2_B, GPIO.IN)
+        if self.channel_A_enabled:
+            self.pwm_1_A.stop()
+            self.pwm_2_A.stop()
+            GPIO.setup(self.IN_1_A, GPIO.IN)
+            GPIO.setup(self.IN_2_A, GPIO.IN)
+
+        if self.channel_B_enabled:
+            self.pwm_1_B.stop()
+            self.pwm_2_B.stop()
+            GPIO.setup(self.IN_1_B, GPIO.IN)
+            GPIO.setup(self.IN_2_B, GPIO.IN)
+
         GPIO.setup(self.ENABLE, GPIO.IN)
 
     # When an object is no longer being used by a program, Python's garbage
@@ -548,7 +466,6 @@ class DRV8833:
     def __exit__(self, exc_type, exc_value, tb):
 
         if exc_type is not None:
-            logger.error('Exception during call to __exit__: {}'.format(exc_type))
             return False
 
         self.close()
@@ -562,25 +479,6 @@ class DRV8833:
 if __name__ == '__main__':
 
     from time import sleep
-
-    # ------------------------------- logger setup ------------------------------- #
-
-    # create a logger instance
-    logger = logging.getLogger('MAIN')
-    logger.setLevel(logging.INFO)
-
-    # create a formatter instance
-    formatter = logging.Formatter(
-        '%(asctime)s\t%(name)s\t%(levelname)s\t%(message)s'
-    )
-
-    # create a handler instance
-    handler = logging.FileHandler('../../log/DRV8833.log', 'w')
-    # handler.setLevel(logging.DEBUG)
-    handler.setFormatter(formatter)
-
-    logger.addHandler(handler)
-
 
     # --------------------------- float range generator -------------------------- #
 
@@ -614,25 +512,40 @@ if __name__ == '__main__':
 
     # -------------------------------- actual test ------------------------------- #
 
+    import config
+
+    IN_1_LEFT = 21
+    IN_2_LEFT = 20
+    IN_1_RIGHT = 16
+    IN_2_RIGHT = 12
+    ENABLE = 7
+
     with DRV8833(
-            IN_1_B=21, IN_2_B=20,
-            IN_1_A=16, IN_2_A=12,
-            ENABLE=7
+            IN_1_A=IN_1_LEFT, IN_2_A=IN_2_LEFT,
+            IN_1_B=IN_1_RIGHT, IN_2_B=IN_2_RIGHT,
+            ENABLE=ENABLE
     ) as motor_driver:
 
-        # 65 is ascii uppercase a
-        # 66 is ascii uppercase b
-        for i in range(65, 67):
-            channel = chr(i)
-            for rate in frange(-1.0, 1.0, 0.1):
+        motor_driver.setSlowDecay()
+        print('Decay: {}'.format(
+            'SLOW' if motor_driver.getDecayMode() == Decay.SLOW else 'FAST'
+        ))
+
+        # --------------------- test both channels independently --------------------- #
+
+        for channel in range(2):
+
+            for rate in frange(-1.0, 1.1, 0.1):
                 print('Channel {}\tDirection {}\t Duty cycle {}'.format(
-                    channel, 'forward' if rate > 0 else 'backward', round(rate, 2)))
+                    chr(channel + 65), 'forward' if rate > 0 else 'backward', round(rate, 2)))
                 motor_driver.write(channel, rate)
                 sleep(1)
 
             # stop the motor, otherwise the last suitable rate is kept
-            print('Stopping channel {}'.format(channel))
-            motor_driver.write(channel, 0)
+            print('Stopping channel {}'.format(chr(channel + 65)))
+            motor_driver.stop(channel)
+
+        # -------------------- test both channels at the same time ------------------- #
 
         # test both motors at the same time
         for rate in frange(-1.0, 1.0, 0.1):
@@ -642,9 +555,33 @@ if __name__ == '__main__':
             motor_driver.write('b', rate)
             sleep(1)
 
+        # stop the motor, otherwise the last suitable rate is kept
+        print('Stopping both channels')
+        motor_driver.stop('b')
+        motor_driver.stop('a')
+
     # the close() function is automatically called by __exit__()
     # once the with block ends
 
-    # stop the motor, otherwise the last suitable rate is kept
-    print('Stopping channel {}'.format(channel))
-    motor_driver.write(channel, 0)
+    # ------------------------ test two DRV8833 instances ------------------------ #
+
+    with DRV8833(
+            IN_1_A=IN_1_LEFT, IN_2_A=IN_2_LEFT,
+            IN_1_B=None, IN_2_B=None,
+            ENABLE=ENABLE
+    ) as left_motor, DRV8833(
+            IN_1_A=None, IN_2_A=None,
+            IN_1_B=IN_1_RIGHT, IN_2_B=IN_2_RIGHT,
+            ENABLE=ENABLE
+    ) as right_motor:
+        
+        # test both motors at the same time
+        for rate in frange(-1.0, 1.0, 0.1):
+            print('Both channels \tDirection {}\t Duty cycle {}'.format(
+                'forward' if rate > 0 else 'backward', round(rate, 2)))
+
+            # later on these methods will be enclosed into another class
+            # that will stream the channel for each write
+            left_motor.write('a', rate)
+            right_motor.write('b', rate)
+            sleep(1)

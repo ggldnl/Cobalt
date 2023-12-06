@@ -1,107 +1,47 @@
-import logging
-
-from Cobalt.hardlib.DRV8833.DRV8833 import DRV8833
-from hardlib.VL53L0.VL53L0 import VL53L0
-from Cobalt.hardlib.MPU6050.MPU6050 import MPU6050
-
-from Cobalt.lib.Encoder.encoder import Encoder
-
-# ---------------------------------- logging --------------------------------- #
-
-# Formatter: A formatter defines the layout of the log records. 
-# It determines how each message should be structured, including
-# the timestamp, the severity level, the message itself, and any 
-# additional data. You can use a built-in formatter or create 
-# your own using Python's string formatting syntax.
-
-# Handler: A handler specifies where the log records should be 
-# sent. It can write them to a file, a socket, a database, or 
-# any other type of output stream. You can configure a handler 
-# to filter out messages based on their severity level, so that 
-# only relevant ones are processed.
-
-# Filter: A filter provides a way to further refine the messages 
-# that are sent to a handler. It allows you to exclude certain 
-# messages based on their content or other criteria.
+import time
 
 
-# create a logger instance
-logger = logging.getLogger('MAIN')
-logger.setLevel(logging.INFO)
 
-# create a formatter instance
-formatter = logging.Formatter(
-    '%(asctime)s\t%(name)s\t%(levelname)s\t%(message)s'
-    )
+def unicicle_to_differential(robot, v, w):
+    # v = translational velocity (m/s)
+    # w = angular velocity (RAD/s)
 
-# create a handler instance
-handler = logging.FileHandler('log/cobalt.log', 'w')
-# handler.setLevel(logging.DEBUG)
-handler.setFormatter(formatter)
+    R = robot.wheel_radius
+    L = robot.base_length
 
-logger.addHandler(handler)
+    v_l = ((2.0 * v) - (w * L)) / (2.0 * R)
+    v_r = ((2.0 * v) + (w * L)) / (2.0 * R)
+
+    return v_l, v_r
 
 
-# ----------------------------------- main ----------------------------------- #
+command = [(10, 10), 10]
 
 
-def frange(start, stop=None, step=None):
+# desired frequency in Hz
+frequency = 10
 
-    start = float(start)
-    if stop == None:        # if stop is not specified
-        stop = start + 0.0
-        start = 0.0
-    if step == None:        # if step is not specified
-        step = 1.0
+# compute the time duration between iterations
+interval = 1 / frequency
+while True:
 
-    # print("start = ", start, "stop = ", stop, "step = ", step)
+    start_time = time.perf_counter()
 
-    count = 0
-    while True:
-        temp = float(start + count * step)
-        if step > 0 and temp >= stop:
-            break
-        elif step < 0 and temp <= stop:
-            break
-        yield temp
-        count += 1
+    if command:
 
-def main():
+        # read unicicle
+        v = command[0]
+        w = command[1]
 
-    logger.info('Starting Cobalt')
+        # convert from unicicle to differential drive model
+        vl, vr = unicicle_to_differential(v, w)
 
-    import time
+        robot.update_motors(vl, vr)
 
-    with Encoder(
-        PIN_CLK = 25,
-        PIN_DT = 8
-    ) as encoder, DRV8833(
-        IN_1_A = 21, IN_2_A = 20,
-        IN_1_B = 16, IN_2_B = 12,
-        ENABLE = 7
-    ) as motor_driver:
-        
-        channel = 'A'
 
-        for rate in frange(-1.0, 1.0, 0.05):
+    elapsed_time = time.perf_counter() - start_time
+    sleep_time = interval - elapsed_time
 
-            motor_driver.write(channel, rate)
-            val = encoder.read_count() // 3 # 3 pole encoder
-            
-            _rate = round(rate, 2)
-            pwm = (abs(_rate) * 100)
-
-            print('Channel {}\tDirection {}\t PWM {}\tDuty cycle {}\tEncoder ticks {}'.format(
-                channel, 'forward' if rate > 0 else 'backward' , round(pwm,2), round(rate, 2), val))
-            #print('PWM [{:5.2f}] -> RPM [{}]'.format(pwm, val))
-
-            time.sleep(1)
-
-        # stop the motor, otherwise the last suitable rate is kept
-        print('Stopping channel {}'.format(channel))
-        motor_driver.write(channel, 0)
-
-    logger.info('Exiting Cobalt')
-
-if __name__ == '__main__':
-    main()
+    #if sleep_time > 0:
+    #   time.sleep(sleep_time)
+    time.sleep(sleep_time)
